@@ -69,10 +69,22 @@
   box-sizing: border-box;
 }
 
+/* Touch behaviour for the installed app: a tap on the board or any control
+   must not double-tap-zoom, begin a text selection, or raise the long-press
+   callout — all three fire easily during fast play. Prose stays selectable. */
+button,
+.tile {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
 html,
 body,
 #root {
   min-height: 100%;
+  overscroll-behavior: none;
 }
 
 body {
@@ -112,6 +124,11 @@ p {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* Installed, the page draws under the status bar and home indicator, so
+     every screen clears the insets here instead of padding itself. */
+  padding:
+    env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 .screen {
@@ -1258,6 +1275,39 @@ input[type='radio'] {
   accent-color: var(--accent);
   flex: none;
   margin: 1px 0 0;
+}
+
+/* -------------------------------------------------- service-worker toast -- */
+
+/* Pinned above the home indicator so it never covers the palette. */
+.update-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 20;
+  width: min(calc(100vw - 24px), 420px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.update-toast__text {
+  font-size: 0.9rem;
+  color: var(--ink-dim);
+}
+
+.update-toast__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 
 /* --------------------------------------------------------------- large --- */

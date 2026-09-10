@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Chromaflow</title>
     <meta name="description" content="Chromaflow - a turn-limited colour flood puzzle. Spread your flow across the board and finish on the target hue." />
     <meta name="theme-color" content="#080d1c" />
+    <!-- Installed-app chrome. iOS needs its own prefixed pair, and
+         black-translucent draws the page under the status bar, which the
+         safe-area padding in index.css accounts for. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Chromaflow" />
   </head>
   <body>
     <div id="root"></div>
