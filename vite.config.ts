@@ -40,6 +40,10 @@ export default defineConfig({
         // The whole game is well under a megabyte and has no backend, so
         // precaching every built file makes it fully playable offline.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        // The iOS launch images are read by Safari at launch, never by the
+        // running app, so precaching them would roughly double the offline
+        // payload for files the game itself never requests.
+        globIgnores: ['**/splash-*.png'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
       },
