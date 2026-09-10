@@ -141,52 +141,47 @@ game plays with no network at all. There is no backend to be offline from.
   new deploy surfaces the toast in `src/components/UpdatePrompt.tsx`, and the
   bundle is only swapped when the player taps **Reload** — never mid-level.
 
-## Deploying to Cloudflare
+## Deploying to Cloudflare Pages
 
 The game is static, so hosting only needs to serve files over HTTPS — a service
-worker will not register without it. It deploys as a Cloudflare Worker with
-static assets: free at this size, builds straight from the repo, and issues the
-certificate itself.
+worker will not register without it. Cloudflare Pages is the fit here: free at
+this size, deploys straight from the repo, and issues the certificate itself.
 
-Connect the repository in the Cloudflare dashboard (*Workers & Pages* →
-*Create* → *Import a repository*) with:
+Connect the repository in the Cloudflare dashboard (*Workers & Pages* → *Create*
+→ *Pages* → *Connect to Git*) with:
 
 | Setting | Value |
 | --- | --- |
 | Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Path | `/` |
+| Output directory | `dist` |
 | Node version | read from `.node-version` (22) |
 
-Three files in this repo matter to the deploy:
+Two files in this repo matter to the deploy:
 
-- `wrangler.jsonc` — points the Worker at `dist/`. Without it `wrangler deploy`
-  has nothing to act on and fails; there is no output-directory field in the
-  dashboard for this flow, unlike Pages.
-- `.node-version` — Vite 8 needs Node 20+, and the build image defaults to an
-  older runtime without it.
-- `public/_headers` — the cache policy, copied into `dist/` at build time and
-  honoured natively by Workers static assets. Hashed bundles under `/assets/*`
-  are immutable for a year; `index.html`, `sw.js` and `manifest.webmanifest`
-  are `no-cache`, because those three decide which bundle a browser gets.
-  Caching them is what leaves an installed copy stuck on an old version after
-  a deploy.
+- `.node-version` — Vite 8 needs Node 20+, and Pages defaults to an older
+  runtime without it.
+- `public/_headers` — the cache policy. Hashed bundles under `/assets/*` are
+  immutable for a year; `index.html`, `sw.js` and `manifest.webmanifest` are
+  `no-cache`, because those three decide which bundle a browser gets. Caching
+  them is what leaves an installed copy stuck on an old version after a deploy.
 
-The `*.workers.dev` URL this produces is HTTPS, so the game is fully
-installable from it — a custom domain is optional.
+The `*.pages.dev` URL this produces is HTTPS, so the game is fully installable
+from it — worth testing there before touching DNS. A custom domain is optional.
 
 ### Custom domains
 
-A Worker custom domain must be a hostname inside a zone on your Cloudflare
-account, so pointing your own domain at the game means moving the domain's DNS
-to Cloudflare (a nameserver change at the registrar; the registration itself
-stays put). Check that MX and SPF/DKIM records import correctly before
-switching, or mail for that domain breaks.
+Add the domain under the Pages project's *Custom domains* tab; Cloudflare
+provisions the certificate once DNS resolves. What that takes depends on which
+hostname you use:
 
-Cloudflare Pages, by contrast, can take a CNAME from DNS hosted elsewhere.
-If keeping DNS at the current registrar matters more than being on the newer
-platform, deploy to Pages instead — build command and `_headers` are identical,
-and the output directory is `dist`.
+- **A subdomain** (`play.example.com`) — add the CNAME Cloudflare shows you at
+  whatever host already runs the domain's DNS. Nothing moves, and mail for the
+  domain is untouched. Pages accepts a CNAME from external DNS; a Cloudflare
+  *Worker* would not, which is why this project deploys to Pages.
+- **The apex** (`example.com`) — DNS has to move to Cloudflare, because DNS
+  forbids a CNAME at the zone root. That is a nameserver change at the
+  registrar; the registration itself stays put. Check that MX and SPF/DKIM
+  records import correctly *before* switching, or mail for that domain breaks.
 
 ## Architecture
 

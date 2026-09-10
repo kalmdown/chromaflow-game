@@ -1,5 +1,4 @@
-# Cache policy, honoured natively by Cloudflare Workers static assets
-# (and by Pages, in the same format).
+# Cache policy for Cloudflare Pages.
 #
 # The hashed bundles can be cached forever; the three files that decide which
 # bundle a browser gets must not be, or an installed copy of the game can keep
