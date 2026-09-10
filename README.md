@@ -29,7 +29,7 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 | `npm run levels:build` | Dev-only: regenerate `src/game/levels.ts` from the specs in `scripts/generate-levels.ts` |
 | `npm run levels:analyze` | Dev-only: difficulty profile of every level — forced moves, grind moves, options per move |
 | `npm run levels:shapes` | Dev-only: build each shape at 8×8–12×12 and report how the results play |
-| `python3 scripts/generate-icons.py` | Dev-only: regenerate the PWA icon PNGs in `public/` |
+| `python3 scripts/generate-icons.py` | Dev-only: regenerate the PWA icons and iOS launch images in `public/`, and print the `<link>` block for `index.html` |
 
 ## Rules
 
@@ -140,6 +140,19 @@ game plays with no network at all. There is no backend to be offline from.
 - **Updates** are opt-in rather than silent: `registerType: 'prompt'` means a
   new deploy surfaces the toast in `src/components/UpdatePrompt.tsx`, and the
   bundle is only swapped when the player taps **Reload** — never mid-level.
+  The worker is re-checked on `visibilitychange` and hourly, because an
+  installed app is suspended and resumed for days without a navigation, and a
+  navigation is otherwise the only thing that would notice a new build.
+- **Launch images.** iOS ignores the manifest's `background_color` and flashes
+  blank white on launch unless an `apple-touch-startup-image` matches the
+  device exactly, so ten portrait sizes ship. They are deliberately kept out
+  of the Workbox precache (`globIgnores`): Safari reads them at launch and the
+  running app never requests them, so precaching would roughly double the
+  offline payload.
+- **The screen stays awake** while a board is live (`src/hooks/useWakeLock.ts`).
+  A turn-based puzzle invites sitting on one position for a minute, which the
+  OS reads as idle. The lock is dropped on win, loss or leaving the board, and
+  reacquired on return — browsers release it whenever the page is hidden.
 
 ## Deploying to Cloudflare Pages
 
@@ -299,3 +312,16 @@ clears script-writable storage for sites left unopened for about a week. The
 app asks for storage persistence on boot (`requestPersistentStorage`), which
 Chrome grants to installed PWAs and Safari currently ignores — so treat an
 iOS save as durable but not guaranteed.
+
+**Back up / transfer** on the title screen is the answer to that: it copies the
+profile out as text and pastes one back in. Copy/paste rather than a file
+download, because an installed iOS PWA handles `<a download>` and blob URLs
+badly; the share sheet appears only where the API exists.
+
+Imports **merge** rather than overwrite. Every field of a level record is a
+maximum and `flawless` is a disjunction, so `mergeSaves` is order-independent —
+importing A into B gives the same profile as importing B into A, and a device
+with its own progress cannot lose a level to an import. Settings stay local,
+since motion and symbol preferences describe the device, not the profile. That
+property is also what any future cross-device sync would be built on; the merge
+is pinned by tests in `src/game/__tests__/progress.test.ts`.
