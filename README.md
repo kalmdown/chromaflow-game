@@ -27,6 +27,7 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 | `npm test` | Vitest — engine unit tests plus a solvability replay of all 18 levels |
 | `npm run levels:validate` | Dev-only: replay every level's reference solution and report |
 | `npm run levels:build` | Dev-only: regenerate `src/game/levels.ts` from the specs in `scripts/generate-levels.ts` |
+| `python3 scripts/generate-icons.py` | Dev-only: regenerate the PWA icon PNGs in `public/` |
 
 ## Rules
 
@@ -100,6 +101,48 @@ entry, then `npm run levels:build`.
 | **Key** | Absorbed like any tile of its colour; opens every lock in its group. |
 | **Lock** | Grey and unabsorbable until its key is collected. While locked it does **not** count as an available target-colour tile. |
 | **Shuffle** | Absorbs normally, then instantly re-deals the colours of the remaining ordinary tiles. Positions, tile kinds, key/lock pairings, locked tiles and your own region are all preserved. |
+
+## Installing it as an app
+
+The build is an installable PWA: a web manifest, maskable icons, and a Workbox
+service worker that precaches every built file (~300 KB), so once loaded the
+game plays with no network at all. There is no backend to be offline from.
+
+- **Android / Chrome** — the browser offers "Install app" on its own.
+- **iOS / Safari** — no prompt exists; the player must use Share → *Add to
+  Home Screen*. Once installed it runs without browser chrome, drawing under
+  the status bar, which the safe-area padding in `index.css` accounts for.
+- **Updates** are opt-in rather than silent: `registerType: 'prompt'` means a
+  new deploy surfaces the toast in `src/components/UpdatePrompt.tsx`, and the
+  bundle is only swapped when the player taps **Reload** — never mid-level.
+
+## Deploying to Cloudflare Pages
+
+The game is static, so hosting only needs to serve files over HTTPS — a service
+worker will not register without it. Cloudflare Pages is the fit here: free at
+this size, deploys straight from the repo, and issues the certificate itself.
+
+Connect the repository in the Cloudflare dashboard (*Workers & Pages* → *Create*
+→ *Pages* → *Connect to Git*) with:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Node version | read from `.node-version` (22) |
+
+Two files in this repo matter to the deploy:
+
+- `.node-version` — Vite 8 needs Node 20+, and Pages defaults to an older
+  runtime without it.
+- `public/_headers` — the cache policy. Hashed bundles under `/assets/*` are
+  immutable for a year; `index.html`, `sw.js` and `manifest.webmanifest` are
+  `no-cache`, because those three decide which bundle a browser gets. Caching
+  them is what leaves an installed copy stuck on an old version after a deploy.
+
+For a custom domain, add it under the project's *Custom domains* tab and create
+the record it asks for at your registrar — the domain does not need to move.
+Cloudflare provisions the certificate once DNS resolves.
 
 ## Architecture
 
@@ -197,3 +240,9 @@ best score, best spare turns, the flawless flag, the last level played and the
 two settings. Reads are defensive — a corrupt or missing blob degrades to a
 fresh profile rather than throwing, and writes are wrapped so private-browsing
 modes just don't persist. **Reset progress** on the title screen clears it.
+
+Installed on a phone this is the only copy of a player's progress, and iOS
+clears script-writable storage for sites left unopened for about a week. The
+app asks for storage persistence on boot (`requestPersistentStorage`), which
+Chrome grants to installed PWAs and Safari currently ignores — so treat an
+iOS save as durable but not guaranteed.

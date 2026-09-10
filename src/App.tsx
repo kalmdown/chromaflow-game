@@ -5,6 +5,7 @@ import { GameScreen } from './components/GameScreen.tsx'
 import type { WinPayload } from './components/GameScreen.tsx'
 import { HowToPlay } from './components/HowToPlay.tsx'
 import { Modal } from './components/Modal.tsx'
+import { UpdatePrompt } from './components/UpdatePrompt.tsx'
 import { LEVELS, TOTAL_LEVELS, getLevel } from './game/levels.ts'
 import {
   clearSave,
@@ -12,6 +13,7 @@ import {
   highestUnlocked,
   loadSave,
   recordWin,
+  requestPersistentStorage,
   saveSave,
 } from './game/progress.ts'
 import type { SaveData, Settings } from './game/progress.ts'
@@ -30,6 +32,9 @@ export default function App() {
 
   // Persist on every change; the save blob is tiny so this stays cheap.
   useEffect(() => saveSave(save), [save])
+
+  // Ask once per load that the browser keep the save through storage pressure.
+  useEffect(() => requestPersistentStorage(), [])
 
   useEffect(() => {
     document.documentElement.dataset.motion = reducedMotion ? 'reduced' : 'full'
@@ -103,6 +108,8 @@ export default function App() {
       )}
 
       {howToOpen && <HowToPlay onClose={() => setHowToOpen(false)} />}
+
+      <UpdatePrompt />
 
       {confirmReset && (
         <Modal

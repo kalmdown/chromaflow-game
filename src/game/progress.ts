@@ -113,3 +113,19 @@ export function highestUnlocked(save: SaveData, total: number): number {
   for (let id = 1; id <= total; id++) if (isUnlocked(save, id)) highest = id
   return highest
 }
+
+/**
+ * Best-effort request that the browser exempt our save from routine eviction.
+ *
+ * iOS clears script-writable storage for sites left unopened for about a week,
+ * which would quietly wipe a player's stars. Chrome grants persistence to
+ * installed PWAs without prompting; Safari ignores the request today. Nothing
+ * here can fail loudly — an unpersisted save is the status quo.
+ */
+export function requestPersistentStorage(): void {
+  try {
+    void navigator.storage?.persist?.()?.catch(() => {})
+  } catch {
+    // Not available in this browser.
+  }
+}
