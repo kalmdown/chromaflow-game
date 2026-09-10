@@ -100,6 +100,9 @@ function greedyAttempt(
       if (color === state.board.ownedColor) continue
       const result = applyMove(state, color)
       if (!result.ok || result.state.status === 'lost') continue
+      // Recolouring without absorbing anything only changes the owned colour,
+      // which the next pick would have done anyway - it is a wasted turn.
+      if (result.absorbed.length === 0) continue
       candidates.push({
         color,
         gain: result.absorbed.length,
@@ -128,6 +131,51 @@ function greedyAttempt(
     if (countUnowned(state.board) === 0) break
   }
   return { moves: null, seed: rng }
+}
+
+export interface SolutionProfile {
+  /** Live options before each move. */
+  options: number[]
+  /** Tiles absorbed by each move. */
+  absorbed: number[]
+  /** Moves where only one colour both survived and absorbed anything. */
+  forced: number
+  /** Moves that absorbed two tiles or fewer. */
+  grind: number
+}
+
+/**
+ * How interesting is this solution to actually play?
+ *
+ * A move with a single live option is a forced click - the player pays a turn
+ * to walk down a corridor - and a move absorbing one or two tiles is a grind.
+ * Narrow board entrances produce both, so generation gates on these.
+ */
+export function profileSolution(level: LevelDefinition, solution: ColorId[]): SolutionProfile {
+  let state = createGame(level)
+  const options: number[] = []
+  const absorbed: number[] = []
+
+  for (const color of solution) {
+    let live = 0
+    for (const candidate of level.colors) {
+      if (candidate === state.board.ownedColor) continue
+      const trial = applyMove(state, candidate)
+      if (!trial.ok || trial.state.status === 'lost' || trial.absorbed.length === 0) continue
+      live++
+    }
+    options.push(live)
+    const result = applyMove(state, color)
+    absorbed.push(result.absorbed.length)
+    state = result.state
+  }
+
+  return {
+    options,
+    absorbed,
+    forced: options.filter((n) => n <= 1).length,
+    grind: absorbed.filter((n) => n <= 2).length,
+  }
 }
 
 export interface LevelReport {
