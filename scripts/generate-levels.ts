@@ -11,13 +11,13 @@
  * shipped catalogue cannot contain an unwinnable board.
  */
 import { writeFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { findSolution } from '../src/game/solver.ts'
+import { findSolution, profileSolution } from '../src/game/solver.ts'
 import { nextInt, nextRandom } from '../src/game/rng.ts'
 import type { ColorId, LevelDefinition } from '../src/game/types.ts'
 
-type Layout =
+export type Layout =
   | 'blobs'
   | 'bands'
   | 'rings'
@@ -26,7 +26,7 @@ type Layout =
   | 'quadrants'
   | 'gradient'
   | 'veins'
-type Shape =
+export type Shape =
   | 'full'
   | 'atoll'
   | 'cross'
@@ -43,7 +43,7 @@ interface SpecialPlan {
   shuffles?: number
 }
 
-interface LevelSpec {
+export interface LevelSpec {
   name: string
   width: number
   height: number
@@ -105,7 +105,7 @@ const SPECS: LevelSpec[] = [
     layout: 'blobs', shape: 'serpentine', seed: 7013, slack: 3, moves: [9, 16],
   },
   {
-    name: 'Atoll', width: 9, height: 9, colors: SIX, target: 2,
+    name: 'Atoll', width: 11, height: 11, colors: SIX, target: 2,
     layout: 'rings', shape: 'atoll', seed: 8117, slack: 3, moves: [8, 15],
   },
   {
@@ -113,7 +113,7 @@ const SPECS: LevelSpec[] = [
     layout: 'quadrants', shape: 'cross', seed: 9227, slack: 3, moves: [9, 17],
   },
   {
-    name: 'Hourglass', width: 10, height: 10, colors: SIX, target: 3,
+    name: 'Hourglass', width: 11, height: 11, colors: SIX, target: 3,
     layout: 'gradient', shape: 'hourglass', seed: 10333, slack: 3, moves: [9, 16],
   },
 
@@ -137,7 +137,7 @@ const SPECS: LevelSpec[] = [
   },
   {
     name: 'Deadbolt', width: 10, height: 10, colors: SIX, target: 5,
-    layout: 'weave', shape: 'pillars', seed: 14251, slack: 3, moves: [10, 18],
+    layout: 'quadrants', shape: 'pillars', seed: 14251, slack: 3, moves: [10, 18],
     specials: { lockGroups: 2, lockClusterSize: 6 },
   },
 
@@ -181,7 +181,7 @@ const STEPS: [number, number][] = [
   [0, -1],
 ]
 
-function makeGrid(spec: LevelSpec, seed: number): { grid: Grid; seed: number } {
+export function makeGrid(spec: LevelSpec, seed: number): { grid: Grid; seed: number } {
   const { width, height } = spec
   const colors: (ColorId | null)[] = new Array(width * height).fill(null)
   let s = seed
@@ -327,7 +327,7 @@ function traceVeins(
   return s
 }
 
-function shapeMask(shape: Shape, width: number, height: number): boolean[] {
+export function shapeMask(shape: Shape, width: number, height: number): boolean[] {
   const mask: boolean[] = new Array(width * height).fill(true)
   const set = (x: number, y: number, v: boolean) => {
     if (x >= 0 && y >= 0 && x < width && y < height) mask[y * width + x] = v
@@ -420,35 +420,43 @@ function shapeMask(shape: Shape, width: number, height: number): boolean[] {
       break
     }
   }
-  carveInlet(mask, width, height)
+  carveBay(mask, width, height)
   return mask
 }
 
 /**
- * (0,0) must always be playable. Symmetric shapes bite off all four corners,
- * so when the origin lands in a bite we open a one-tile inlet along the top row
- * (or left column) until it meets the body — which reads as a deliberate
- * channel rather than a stray floating tile.
+ * (0,0) must always be playable. Symmetric shapes bite off all four corners, so
+ * when the origin lands in a bite we have to reconnect it.
+ *
+ * Opening a one-tile channel to the body was the obvious way and the wrong one:
+ * a corridor one tile wide has exactly one colour at each step, so every move
+ * through it is forced and the level opens with several wasted turns. Instead
+ * open the whole corner triangle up to the body's nearest diagonal, which meets
+ * it across a wide front — the origin gets a bay with several ways out of it.
  */
-function carveInlet(mask: boolean[], width: number, height: number): void {
+function carveBay(mask: boolean[], width: number, height: number): void {
   if (mask[0]) return
-  let x = 0
-  while (x < width && !mask[x]) x++
-  let y = 0
-  while (y < height && !mask[y * width]) y++
 
-  if (x < width && (y >= height || x <= y)) {
-    for (let k = 0; k <= x; k++) mask[k] = true
-  } else if (y < height) {
-    for (let k = 0; k <= y; k++) mask[k * width] = true
-  } else {
+  let nearest = Infinity
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (mask[y * width + x]) nearest = Math.min(nearest, x + y)
+    }
+  }
+  if (!Number.isFinite(nearest)) {
     mask[0] = true
+    return
+  }
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (x + y < nearest) mask[y * width + x] = true
+    }
   }
 }
 
 // -------------------------------------------------------------- specials ---
 
-function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: string[]; seed: number } {
+export function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: string[]; seed: number } {
   const { width, height } = grid
   const tokens: string[] = grid.colors.map((c) => (c === null ? '.' : String(c)))
   let s = seed
@@ -529,7 +537,7 @@ function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: string[
 // ---------------------------------------------------------------- checks ---
 
 /** Every playable tile must be reachable from (0,0), ignoring colours. */
-function isConnected(grid: Grid): boolean {
+export function isConnected(grid: Grid): boolean {
   const { width, height, colors } = grid
   const seen = new Uint8Array(colors.length)
   const stack = [0]
@@ -558,6 +566,19 @@ function playableCount(rows: string[]): number {
 }
 
 // ----------------------------------------------------------------- build ---
+
+/**
+ * Is this solution worth playing? Solvable is the floor, not the bar: a board
+ * can be perfectly winnable and still open with three forced clicks and a
+ * string of two-tile nibbles. Two forced moves is the natural floor (the
+ * endgame really does narrow to one colour), so only more than that is a smell.
+ */
+function isEngaging(level: LevelDefinition, solution: ColorId[]): boolean {
+  const { forced, grind, absorbed } = profileSolution(level, solution)
+  if (absorbed[0] < 3) return false
+  if (forced > 3) return false
+  return grind <= Math.max(2, Math.round(solution.length * 0.25))
+}
 
 function buildLevel(spec: LevelSpec, id: number): LevelDefinition {
   const seedBudget = 160
@@ -594,8 +615,12 @@ function buildLevel(spec: LevelSpec, id: number): LevelDefinition {
 
     const level = finalise(draft, spec, solution)
     const [lo, hi] = spec.moves
-    if (solution.length >= lo && solution.length <= hi) return level
-    if (!fallback) fallback = level
+    const rightLength = solution.length >= lo && solution.length <= hi
+    if (rightLength && isEngaging(level, solution)) return level
+    // Prefer a board that plays well over one that is merely the right length.
+    if (!fallback || (isEngaging(level, solution) && !isEngaging(fallback, fallback.solution ?? []))) {
+      fallback = level
+    }
   }
 
   if (fallback) {
@@ -667,13 +692,23 @@ export function getLevel(id: number): LevelDefinition | undefined {
 }
 
 const here = dirname(fileURLToPath(import.meta.url))
-const levels = SPECS.map((spec, index) => {
-  const level = buildLevel(spec, index + 1)
-  console.log(
-    `level ${String(level.id).padStart(2)}  ${level.name.padEnd(20)} ` +
-      `${level.width}x${level.height}  solution=${level.solution?.length}  limit=${level.turnLimit}`,
-  )
-  return level
-})
-writeFileSync(resolve(here, '../src/game/levels.ts'), emit(levels), 'utf8')
-console.log(`\nwrote ${levels.length} levels to src/game/levels.ts`)
+
+/** Only writes the catalogue when run directly, so other dev scripts can import
+ *  the board builders above without triggering a regeneration. */
+function buildCatalogue(): void {
+  const levels = SPECS.map((spec, index) => {
+    const level = buildLevel(spec, index + 1)
+    console.log(
+      `level ${String(level.id).padStart(2)}  ${level.name.padEnd(20)} ` +
+        `${level.width}x${level.height}  solution=${level.solution?.length}  limit=${level.turnLimit}`,
+    )
+    return level
+  })
+  writeFileSync(resolve(here, '../src/game/levels.ts'), emit(levels), 'utf8')
+  console.log(`\nwrote ${levels.length} levels to src/game/levels.ts`)
+}
+
+const runDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href
+
+if (runDirectly) buildCatalogue()

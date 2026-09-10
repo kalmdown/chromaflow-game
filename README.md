@@ -27,6 +27,8 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 | `npm test` | Vitest — engine unit tests plus a solvability replay of all 18 levels |
 | `npm run levels:validate` | Dev-only: replay every level's reference solution and report |
 | `npm run levels:build` | Dev-only: regenerate `src/game/levels.ts` from the specs in `scripts/generate-levels.ts` |
+| `npm run levels:analyze` | Dev-only: difficulty profile of every level — forced moves, grind moves, options per move |
+| `npm run levels:shapes` | Dev-only: build each shape at 8×8–12×12 and report how the results play |
 
 ## Rules
 
@@ -78,10 +80,33 @@ mechanically regular.
 | `bands` | repeating diagonal stripes | 3, 16 |
 | `rings` | concentric square rings from the centre | 6, 8, 13 |
 | `patchwork` | 2×2 blocks | 5, 12, 17 |
-| `weave` | interleaved diagonal lattice, most fragmented | 14, 18 |
-| `quadrants` | each quadrant leans on its own overlapping run of three colours, so regions demand different picks | 9 |
+| `weave` | interleaved diagonal lattice, most fragmented | 18 |
+| `quadrants` | each quadrant leans on its own overlapping run of three colours, so regions demand different picks | 9, 14 |
 | `gradient` | one wide band per colour along the diagonal — huge absorptions near the origin, then a long tail | 10 |
 | `veins` | long snaking single-colour threads traced by random walks, so one pick can reach right across the board | 15 |
+
+#### Shapes have a minimum viable size
+
+`npm run levels:shapes` builds every shape at 8×8 through 12×12 and profiles the
+result. The constraint turns out **not** to be how much of the board survives —
+it is **how wide the narrowest passage is**.
+
+Shapes that punch holes into a solid field (`pillars`, `teeth`, `frame`, `cross`)
+keep wide passages and play well from 8×8: 0–17% grind moves, a median of three
+colours worth considering per move. Shapes that carve a *thin structure*
+(`atoll`'s ring, `hourglass`'s neck) leave corridors only a couple of tiles wide
+on a small grid, and the flow stops having choices — `hourglass` at 8×8 profiles
+at four forced moves with a median of **one** live option, and `atoll` at 8×8
+spends 40% of its moves absorbing two tiles or fewer. Both need 11×11 before what
+survives is thick enough to branch.
+
+Density is a misleading proxy: `frame` at 75% density plays fine while `cross` at
+63% plays worse, because the frame's ring stays three tiles thick. So levels 8
+and 10 are 11×11 — but that is not a difficulty spike, because those masks are
+so subtractive that they yield only 66 and 71 playable tiles, *fewer than the
+9×9 boards on levels 5 and 6*.
+
+#### Pairing
 
 Shape and layout are chosen to reinforce each other: `quadrants` gives each lobe
 of the `cross` its own palette, `gradient` runs its strata down the `hourglass`
@@ -167,6 +192,20 @@ colour is adjacent to the owned region.*
 - **A shuffle permutes, it never re-rolls.** The colour multiset is preserved,
   which means a shuffle can never be the thing that makes the target colour run
   out. (A defensive check re-seeds one target tile anyway.)
+- **Solvable is the floor, not the bar.** A board can be perfectly winnable and
+  still open with three forced clicks and a run of two-tile nibbles. Generation
+  therefore also gates on how the reference solution *plays*: the opening move
+  must absorb at least three tiles, at most three moves may have a single live
+  option, and at most a quarter may absorb two tiles or fewer. `levels:analyze`
+  reports the same numbers for the shipped catalogue, so a regression shows up
+  as a flagged row rather than as a level that merely feels bad.
+- **Corner cuts get a bay, not a corridor.** When a mask bites off the corner
+  containing the origin, opening a one-tile channel to the body is the obvious
+  repair and the wrong one — a corridor one tile wide has exactly one colour at
+  each step, so every move through it is forced. `carveBay` instead opens the
+  whole corner triangle up to the body's nearest diagonal, meeting it across a
+  wide front. On Atoll that change alone took the level from four forced moves
+  and six grind moves to two and one.
 - **The catalogue is generated, then frozen.** `scripts/generate-levels.ts` lays
   out each board from a hand-tuned spec (size, palette, layout family, shape
   mask, special-tile plan), searches for a real solution with the engine itself,
