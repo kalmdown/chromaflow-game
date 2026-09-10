@@ -55,30 +55,42 @@ counted; the generator rejects any mask that would disconnect the board, and
 carves a one-tile inlet along the top edge if a corner cut would strand the
 origin at (0,0).
 
+Every shape other than `full` changes how the flow can route — a hole that only
+trims tiles off a far corner is decoration, not design.
+
 | Shape | Effect on play | Levels |
 | --- | --- | --- |
 | `full` | plain rectangle | 1–6, 11, 12, 15, 18 |
-| `serpentine` | two offset walls with gaps at opposite ends — an S-shaped forced route through two chokepoints | 7 |
-| `diamond` | corners cut back to a rhombus | 8, 16 |
+| `serpentine` | two offset walls with gaps at opposite ends — an S-shaped route through two chokepoints | 7 |
+| `atoll` | a diamond with its middle punched out; the far side is reached by committing to one arm of the ring | 8 |
 | `cross` | arms a third of the board wide, so the four lobes meet only at a central hub | 9, 17 |
-| `hourglass` | pinched at the left and right edges mid-board | 10 |
+| `hourglass` | two bulbs joined by a neck a couple of tiles wide that everything has to pass through | 10 |
 | `frame` | hollow centre — you play around a ring | 13 |
 | `pillars` | a lattice of 2×2 obstacles that every route has to weave through | 14 |
+| `teeth` | a comb of dead-end fingers along the bottom edge, each entered and finished deliberately | 16 |
 
 **Layout** — how the hues are distributed, each with 25–35% noise so no board is
 mechanically regular.
 
 | Layout | Character | Levels |
 | --- | --- | --- |
-| `blobs` | clumpy organic regions, big early absorptions | 1, 2, 4, 7, 10, 11, 15 |
-| `bands` | diagonal stripes | 3, 16 |
+| `blobs` | clumpy organic regions, big early absorptions | 1, 2, 4, 7, 11 |
+| `bands` | repeating diagonal stripes | 3, 16 |
 | `rings` | concentric square rings from the centre | 6, 8, 13 |
 | `patchwork` | 2×2 blocks | 5, 12, 17 |
-| `weave` | interleaved diagonal lattice, most fragmented | 9, 14, 18 |
+| `weave` | interleaved diagonal lattice, most fragmented | 14, 18 |
+| `quadrants` | each quadrant leans on its own overlapping run of three colours, so regions demand different picks | 9 |
+| `gradient` | one wide band per colour along the diagonal — huge absorptions near the origin, then a long tail | 10 |
+| `veins` | long snaking single-colour threads traced by random walks, so one pick can reach right across the board | 15 |
 
-Layout drives solution length more than size does: `weave` and `bands` fragment
-the board and need far more moves than `blobs` at the same dimensions. Adding a
-new shape or layout is one `case` in `shapeMask` or `makeGrid` plus a spec
+Shape and layout are chosen to reinforce each other: `quadrants` gives each lobe
+of the `cross` its own palette, `gradient` runs its strata down the `hourglass`
+toward the neck, and `veins` gives the shuffle on level 15 something with long
+reach to re-deal.
+
+Layout drives solution length more than size does — `weave` and `bands`
+fragment the board and need far more moves than `blobs` at the same dimensions.
+Adding a shape or layout is one `case` in `shapeMask` or `makeGrid` plus a spec
 entry, then `npm run levels:build`.
 
 ### Special tiles

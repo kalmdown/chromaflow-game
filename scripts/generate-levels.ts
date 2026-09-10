@@ -17,8 +17,24 @@ import { findSolution } from '../src/game/solver.ts'
 import { nextInt, nextRandom } from '../src/game/rng.ts'
 import type { ColorId, LevelDefinition } from '../src/game/types.ts'
 
-type Layout = 'blobs' | 'bands' | 'rings' | 'patchwork' | 'weave'
-type Shape = 'full' | 'diamond' | 'cross' | 'frame' | 'serpentine' | 'pillars' | 'hourglass'
+type Layout =
+  | 'blobs'
+  | 'bands'
+  | 'rings'
+  | 'patchwork'
+  | 'weave'
+  | 'quadrants'
+  | 'gradient'
+  | 'veins'
+type Shape =
+  | 'full'
+  | 'atoll'
+  | 'cross'
+  | 'frame'
+  | 'serpentine'
+  | 'pillars'
+  | 'teeth'
+  | 'hourglass'
 
 interface SpecialPlan {
   /** Number of key/lock groups; each group gets one key and a lock cluster. */
@@ -89,16 +105,16 @@ const SPECS: LevelSpec[] = [
     layout: 'blobs', shape: 'serpentine', seed: 7013, slack: 3, moves: [9, 16],
   },
   {
-    name: 'Cut Diamond', width: 9, height: 9, colors: SIX, target: 2,
-    layout: 'rings', shape: 'diamond', seed: 8117, slack: 3, moves: [8, 15],
+    name: 'Atoll', width: 9, height: 9, colors: SIX, target: 2,
+    layout: 'rings', shape: 'atoll', seed: 8117, slack: 3, moves: [8, 15],
   },
   {
     name: 'Crossflow', width: 10, height: 10, colors: SIX, target: 0,
-    layout: 'weave', shape: 'cross', seed: 9227, slack: 3, moves: [9, 16],
+    layout: 'quadrants', shape: 'cross', seed: 9227, slack: 3, moves: [9, 17],
   },
   {
     name: 'Hourglass', width: 10, height: 10, colors: SIX, target: 3,
-    layout: 'blobs', shape: 'hourglass', seed: 10333, slack: 3, moves: [10, 16],
+    layout: 'gradient', shape: 'hourglass', seed: 10333, slack: 3, moves: [9, 16],
   },
 
   // 11-14 - keys and locks.
@@ -128,13 +144,13 @@ const SPECS: LevelSpec[] = [
   // 15-18 - shuffles, then everything at once.
   {
     name: 'Static', width: 10, height: 10, colors: SIX, target: 0,
-    layout: 'blobs', shape: 'full', seed: 15277, slack: 4, moves: [10, 17],
+    layout: 'veins', shape: 'full', seed: 15277, slack: 4, moves: [10, 18],
     specials: { shuffles: 1 },
     hint: 'A shuffle tile re-deals every unclaimed ordinary tile the moment you absorb it.',
   },
   {
     name: 'Interference', width: 10, height: 10, colors: SIX, target: 3,
-    layout: 'bands', shape: 'diamond', seed: 16333, slack: 3, moves: [10, 18],
+    layout: 'bands', shape: 'teeth', seed: 16333, slack: 3, moves: [10, 19],
     specials: { shuffles: 2 },
   },
   {
@@ -224,10 +240,91 @@ function makeGrid(spec: LevelSpec, seed: number): { grid: Grid; seed: number } {
           put(i, roll.value < 0.35 ? random() : pal[(x * 2 + y * 3) % pal.length])
           break
         }
+        case 'quadrants': {
+          // Each quadrant leans on its own overlapping run of three colours, so
+          // different regions of the board demand different picks and the order
+          // you tackle them in matters.
+          const q = (y < height / 2 ? 0 : 2) + (x < width / 2 ? 0 : 1)
+          const start = q * Math.max(1, Math.floor(pal.length / 4))
+          const sub = [0, 1, 2].map((k) => pal[(start + k) % pal.length])
+          if (roll.value < 0.2) {
+            put(i, random())
+          } else {
+            const pick = nextInt(s, sub.length)
+            s = pick.seed
+            put(i, sub[pick.value])
+          }
+          break
+        }
+        case 'gradient': {
+          // One wide band per colour along the diagonal instead of repeating
+          // stripes: huge absorptions near the origin, then a long tail.
+          const t = (x + y) / (width + height - 2)
+          const band = Math.min(pal.length - 1, Math.floor(t * pal.length))
+          put(i, roll.value < 0.28 ? random() : pal[band])
+          break
+        }
+        case 'veins': {
+          // Base coat only — the threads are traced in a second pass below.
+          put(i, random())
+          break
+        }
       }
     }
   }
+  if (spec.layout === 'veins') s = traceVeins(spec, colors, mask, s)
+
   return { grid: { width, height, colors }, seed: s }
+}
+
+/**
+ * Paints long snaking single-colour threads over the base coat with random
+ * walks. A thread can run right across the board, so one well-timed pick
+ * absorbs a huge amount at once — the opposite texture to `blobs`.
+ */
+function traceVeins(
+  spec: LevelSpec,
+  colors: (ColorId | null)[],
+  mask: boolean[],
+  seed: number,
+): number {
+  const { width, height } = spec
+  const playable = mask.filter(Boolean).length
+  const length = Math.round(Math.max(width, height) * 1.6)
+  const walks = Math.round((playable / length) * 2.2)
+  let s = seed
+
+  for (let w = 0; w < walks; w++) {
+    let start = nextInt(s, width * height)
+    s = start.seed
+    let index = start.value
+    let guard = 0
+    while (!mask[index] && guard++ < width * height) index = (index + 1) % (width * height)
+    if (!mask[index]) continue
+
+    const hue = nextInt(s, spec.colors.length)
+    s = hue.seed
+    const color = spec.colors[hue.value]
+
+    for (let step = 0; step < length; step++) {
+      colors[index] = color
+      const x = index % width
+      const y = (index / width) | 0
+      const options: number[] = []
+      for (const [dx, dy] of STEPS) {
+        const nx = x + dx
+        const ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
+        const n = ny * width + nx
+        if (mask[n]) options.push(n)
+      }
+      if (options.length === 0) break
+      const pick = nextInt(s, options.length)
+      s = pick.seed
+      index = options[pick.value]
+    }
+  }
+  return s
 }
 
 function shapeMask(shape: Shape, width: number, height: number): boolean[] {
@@ -241,12 +338,25 @@ function shapeMask(shape: Shape, width: number, height: number): boolean[] {
   switch (shape) {
     case 'full':
       break
-    case 'diamond': {
-      const r = Math.floor((width + height) / 4) + 1
+    case 'atoll': {
+      // A diamond with its middle punched out: the flow reaches the far side by
+      // committing to one arm of the ring and coming round, not straight across.
+      const outer = Math.floor((width + height) / 4) + 1
+      const inner = Math.max(2, outer - 2)
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-          if (Math.abs(x - cx) + Math.abs(y - cy) > r) set(x, y, false)
+          const d = Math.abs(x - cx) + Math.abs(y - cy)
+          if (d > outer || d < inner) set(x, y, false)
         }
+      }
+      break
+    }
+    case 'teeth': {
+      // A comb of dead-end fingers along the bottom. Each one has to be entered
+      // deliberately and finished, so they punish greedy colour picks.
+      const depth = Math.max(2, Math.floor(height / 3))
+      for (let x = 2; x < width; x += 3) {
+        for (let y = height - depth; y < height; y++) set(x, y, false)
       }
       break
     }
@@ -294,10 +404,15 @@ function shapeMask(shape: Shape, width: number, height: number): boolean[] {
       break
     }
     case 'hourglass': {
-      const mid = Math.floor(height / 2)
+      // Wedges cut from both sides, deepest at the middle rows, so the board is
+      // two bulbs joined by a neck a couple of tiles wide. Everything has to
+      // pass through the neck, which makes the order of the two halves matter.
+      const mid = (height - 1) / 2
+      const neck = Math.max(2, Math.floor(width / 5))
       for (let y = 0; y < height; y++) {
-        const pinch = Math.max(0, 2 - Math.abs(y - mid))
-        for (let k = 0; k < pinch; k++) {
+        const closeness = 1 - Math.abs(y - mid) / mid
+        const cut = Math.round(closeness * ((width - neck) / 2))
+        for (let k = 0; k < cut; k++) {
           set(k, y, false)
           set(width - 1 - k, y, false)
         }
