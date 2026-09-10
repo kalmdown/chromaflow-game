@@ -18,7 +18,7 @@ import { nextInt, nextRandom } from '../src/game/rng.ts'
 import type { ColorId, LevelDefinition } from '../src/game/types.ts'
 
 type Layout = 'blobs' | 'bands' | 'rings' | 'patchwork' | 'weave'
-type Shape = 'full' | 'diamond' | 'cross' | 'frame' | 'notch' | 'hourglass'
+type Shape = 'full' | 'diamond' | 'cross' | 'frame' | 'serpentine' | 'pillars' | 'hourglass'
 
 interface SpecialPlan {
   /** Number of key/lock groups; each group gets one key and a lock cluster. */
@@ -86,7 +86,7 @@ const SPECS: LevelSpec[] = [
   // 7-10 - tighter budgets, shaped boards.
   {
     name: 'Narrow Channel', width: 9, height: 9, colors: SIX, target: 5,
-    layout: 'blobs', shape: 'notch', seed: 7013, slack: 3, moves: [9, 15],
+    layout: 'blobs', shape: 'serpentine', seed: 7013, slack: 3, moves: [9, 16],
   },
   {
     name: 'Cut Diamond', width: 9, height: 9, colors: SIX, target: 2,
@@ -121,7 +121,7 @@ const SPECS: LevelSpec[] = [
   },
   {
     name: 'Deadbolt', width: 10, height: 10, colors: SIX, target: 5,
-    layout: 'weave', shape: 'notch', seed: 14251, slack: 2, moves: [10, 18],
+    layout: 'weave', shape: 'pillars', seed: 14251, slack: 3, moves: [10, 18],
     specials: { lockGroups: 2, lockClusterSize: 6 },
   },
 
@@ -251,7 +251,9 @@ function shapeMask(shape: Shape, width: number, height: number): boolean[] {
       break
     }
     case 'cross': {
-      const arm = Math.floor(width / 4)
+      // Arms a third of the board wide, so the four lobes meet only in the
+      // middle and the centre becomes a hub the flow has to pass through.
+      const arm = Math.floor(width / 3)
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const nearLeft = x < arm
@@ -270,10 +272,24 @@ function shapeMask(shape: Shape, width: number, height: number): boolean[] {
       }
       break
     }
-    case 'notch': {
-      const n = Math.floor(width / 3)
-      for (let y = height - n; y < height; y++) {
-        for (let x = width - n; x < width; x++) set(x, y, false)
+    case 'serpentine': {
+      // Two offset walls, each leaving a gap at the opposite end, so the flow
+      // has to work right, then back left, then right again. The gaps are real
+      // chokepoints: crossing one means owning the colour sitting in it.
+      const first = Math.max(2, Math.round(height * 0.35))
+      const second = Math.min(height - 3, Math.round(height * 0.72))
+      const gap = Math.max(2, Math.round(width * 0.3))
+      for (let x = 0; x < width - gap; x++) set(x, first, false)
+      for (let x = gap; x < width; x++) set(x, second, false)
+      break
+    }
+    case 'pillars': {
+      // A lattice of 2x2 obstacles. Nothing is walled off, but every route
+      // between two corners has to weave, which breaks up the big blobs.
+      for (let y = 2; y < height - 1; y++) {
+        for (let x = 2; x < width - 1; x++) {
+          if (x % 4 >= 2 && y % 4 >= 2) set(x, y, false)
+        }
       }
       break
     }

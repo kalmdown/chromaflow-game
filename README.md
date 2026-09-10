@@ -46,6 +46,41 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 - **Stars.** One star for completing, a second and third for score plus spare
   turns. Only *completion* unlocks the next level.
 
+### Board variety
+
+Two independent axes, both set per level in `scripts/generate-levels.ts`.
+
+**Shape** — the board outline. Holes (`void` tiles) are never playable and never
+counted; the generator rejects any mask that would disconnect the board, and
+carves a one-tile inlet along the top edge if a corner cut would strand the
+origin at (0,0).
+
+| Shape | Effect on play | Levels |
+| --- | --- | --- |
+| `full` | plain rectangle | 1–6, 11, 12, 15, 18 |
+| `serpentine` | two offset walls with gaps at opposite ends — an S-shaped forced route through two chokepoints | 7 |
+| `diamond` | corners cut back to a rhombus | 8, 16 |
+| `cross` | arms a third of the board wide, so the four lobes meet only at a central hub | 9, 17 |
+| `hourglass` | pinched at the left and right edges mid-board | 10 |
+| `frame` | hollow centre — you play around a ring | 13 |
+| `pillars` | a lattice of 2×2 obstacles that every route has to weave through | 14 |
+
+**Layout** — how the hues are distributed, each with 25–35% noise so no board is
+mechanically regular.
+
+| Layout | Character | Levels |
+| --- | --- | --- |
+| `blobs` | clumpy organic regions, big early absorptions | 1, 2, 4, 7, 10, 11, 15 |
+| `bands` | diagonal stripes | 3, 16 |
+| `rings` | concentric square rings from the centre | 6, 8, 13 |
+| `patchwork` | 2×2 blocks | 5, 12, 17 |
+| `weave` | interleaved diagonal lattice, most fragmented | 9, 14, 18 |
+
+Layout drives solution length more than size does: `weave` and `bands` fragment
+the board and need far more moves than `blobs` at the same dimensions. Adding a
+new shape or layout is one `case` in `shapeMask` or `makeGrid` plus a spec
+entry, then `npm run levels:build`.
+
 ### Special tiles
 
 | Tile | Behaviour |
