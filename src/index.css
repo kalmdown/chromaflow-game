@@ -1113,6 +1113,18 @@ p {
   background: linear-gradient(160deg, #d778ff, #a94ad1);
 }
 
+/* Legend swatches reuse the real .tile rules, so they always match the board. */
+.legend-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+}
+
+.legend-tile .tile__glyph {
+  opacity: 0.55;
+}
+
 .specials__mark--lock {
   background: repeating-linear-gradient(45deg, #2c3350, #2c3350 4px, #333b5c 4px, #333b5c 8px);
   color: #8b96b8;

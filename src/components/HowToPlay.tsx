@@ -1,5 +1,38 @@
+import type { CSSProperties } from 'react'
 import { Modal } from './Modal.tsx'
 import { KeyMark, LockMark, ShuffleMark } from './Board.tsx'
+import { ColorGlyph } from './Glyph.tsx'
+import { paletteEntry } from '../game/palette.ts'
+import type { ColorId } from '../game/types.ts'
+
+/** A real board tile at legend size — same classes, so it can never drift. */
+function LegendTile({
+  color,
+  owned = false,
+  origin = false,
+}: {
+  color: ColorId
+  owned?: boolean
+  origin?: boolean
+}) {
+  const entry = paletteEntry(color)
+  const style = {
+    '--tile-color': entry.hex,
+    '--tile-shade': entry.shade,
+    '--tile-ink': entry.ink,
+  } as CSSProperties
+  const classes = ['tile', 'legend-tile']
+  if (owned) classes.push('is-owned')
+  if (origin) classes.push('is-origin')
+
+  return (
+    <span className={classes.join(' ')} style={style} aria-hidden="true">
+      <span className="tile__glyph">
+        <ColorGlyph color={color} />
+      </span>
+    </span>
+  )
+}
 
 export function HowToPlay({ onClose }: { onClose: () => void }) {
   return (
@@ -14,7 +47,8 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     >
       <ol className="rules">
         <li>
-          <strong>Grow your flow.</strong> You start owning the top-left tile. Pick a colour and
+          <strong>Grow your flow.</strong> You start owning the top-left tile — the one with
+          the white ring. Pick a colour and
           your whole region turns that colour, swallowing every tile of that colour touching it.
           Tiles connect <em>up, down, left and right only</em> — never diagonally. Tapping a tile
           on the board is a shortcut for picking its colour.
@@ -39,6 +73,32 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
           small turn resets it.
         </li>
       </ol>
+
+      <h3 className="rules__subhead">Reading the board</h3>
+      <ul className="specials">
+        <li>
+          <LegendTile color={3} owned origin />
+          <span>
+            <strong>Your source.</strong> The white ring marks the top-left tile your flow grows
+            from. It is yours from the start and stays yours all level — the ring is just a
+            landmark, it has no other effect.
+          </span>
+        </li>
+        <li>
+          <LegendTile color={3} owned />
+          <span>
+            <strong>Your flow.</strong> Tiles you have absorbed glow brighter and carry a white
+            outline. They always share one colour, and they always move as one piece.
+          </span>
+        </li>
+        <li>
+          <LegendTile color={1} />
+          <span>
+            <strong>Unclaimed.</strong> Flat, unoutlined tiles are still up for grabs. Tap one to
+            play its colour.
+          </span>
+        </li>
+      </ul>
 
       <h3 className="rules__subhead">Special tiles</h3>
       <ul className="specials">
