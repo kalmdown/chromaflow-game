@@ -39,7 +39,6 @@ export function ColorPalette({
             type="button"
             className={`swatch${isCurrent ? ' is-current' : ''}${isTarget ? ' is-target' : ''}`}
             style={tileStyle(entry)}
-            data-texture={textureOf(entry, marks)}
             disabled={disabled || isCurrent}
             onClick={() => onPick(color)}
             aria-keyshortcuts={String(index + 1)}
@@ -53,7 +52,9 @@ export function ColorPalette({
             <span className="swatch__key" aria-hidden="true">
               {index + 1}
             </span>
-            <span className="swatch__glyph">
+            {/* The texture rides the glyph chip, the one part still painted in the
+                raw hue — over the pill it would sit behind the label. */}
+            <span className="swatch__glyph" data-texture={textureOf(entry, marks)}>
               <ColorGlyph color={color} />
             </span>
             <span className="swatch__name">{entry.name}</span>

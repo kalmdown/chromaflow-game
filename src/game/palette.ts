@@ -84,14 +84,15 @@ function theme(id: ThemeId, name: string, glow: [string, string], swatches: Swat
     glow,
     colors: swatches.map(([label, hex], slot) => {
       const color = slot as ColorId
+      const shade = shift(hex, -0.15, -0.1)
       return {
         id: color,
         name: label,
         shape: SHAPES[slot],
         texture: TEXTURES[slot],
         hex,
-        shade: shift(hex, -0.15, -0.1),
-        ink: ink(hex),
+        shade,
+        ink: ink(hex, shade),
       }
     }),
   }
@@ -206,10 +207,46 @@ function shift(hex: string, lightness: number, saturation: number): string {
   return toHex(h, clamp(s + saturation), clamp(l + lightness))
 }
 
-/** Near-black in the same hue, so glyph and label stay readable on the tile. */
-function ink(hex: string): string {
+/**
+ * The mark colour for a tile, tinted in the tile's own hue.
+ *
+ * A tile is a gradient from `hex` down to `shade`, so a mark has to survive
+ * the darker end too. Near-black wins on light hues and near-white on dark
+ * ones; picking whichever scores better against the *worse* of the two stops
+ * keeps every glyph clear of the 3:1 floor for non-text contrast, which the
+ * old always-near-black rule missed on the dark blues and violets.
+ */
+function ink(hex: string, shade: string): string {
   const [h, s] = toHsl(hex)
-  return toHex(h, clamp(Math.min(s, 0.8)), 0.11)
+  const dark = toHex(h, clamp(Math.min(s, 0.8)), 0.11)
+  const light = toHex(h, clamp(Math.min(s, 0.3)), 0.97)
+  return worstContrast(dark, hex, shade) >= worstContrast(light, hex, shade) ? dark : light
+}
+
+/** Contrast of `mark` against whichever of the two gradient stops suits it least. */
+function worstContrast(mark: string, hex: string, shade: string): number {
+  return Math.min(contrast(mark, hex), contrast(mark, shade))
+}
+
+/** WCAG contrast ratio, 1–21. */
+function contrast(a: string, b: string): number {
+  const la = luminance(a)
+  const lb = luminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
+/** WCAG relative luminance. */
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16)
+  const channel = (v: number) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  }
+  return (
+    0.2126 * channel((n >> 16) & 255) +
+    0.7152 * channel((n >> 8) & 255) +
+    0.0722 * channel(n & 255)
+  )
 }
 
 function clamp(v: number): number {

@@ -255,6 +255,15 @@ colour is adjacent to the owned region.*
   supplies them. `Glyph.tsx` draws all seven in a shared 24×24 box, sized for
   roughly equal ink area with the usual optical corrections (solid circle and
   square pulled in, spiky triangle and star pushed out).
+- **Text never rides a raw hue.** A tile is a gradient from its hue down to a
+  darker shade, and no single ink clears 4.5:1 against both ends of a mid-tone
+  one — so anything that is *text* sits on a surface the theme cannot move: the
+  palette pills tint the card behind the label instead of painting it in the
+  hue, and a key's group number gets its own plate. Only marks that are
+  *graphics* stay on the hue itself, where the floor is 3:1; `palette.ts` picks
+  each slot's ink by whichever of near-black or near-white scores better
+  against the worse of the two gradient stops, and `palette.test.ts` fails the
+  build if a theme is ever added that misses it.
 - **Undo is unlimited and snapshot-based.** Each move pushes the previous
   `GameState`; undo restores board, turns, score, combo, unlocked groups, RNG
   cursor and status in one assignment. Using it clears the *flawless* badge for
