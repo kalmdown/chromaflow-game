@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react'
 import { Modal } from './Modal.tsx'
 import { KeyMark, LockMark, ShuffleMark } from './Board.tsx'
+import { textureOf, tileStyle } from './tileStyle.ts'
 import { ColorGlyph } from './Glyph.tsx'
 import { paletteEntry } from '../game/palette.ts'
 import type { ColorId } from '../game/types.ts'
@@ -16,17 +16,17 @@ function LegendTile({
   origin?: boolean
 }) {
   const entry = paletteEntry(color)
-  const style = {
-    '--tile-color': entry.hex,
-    '--tile-shade': entry.shade,
-    '--tile-ink': entry.ink,
-  } as CSSProperties
   const classes = ['tile', 'legend-tile']
   if (owned) classes.push('is-owned')
   if (origin) classes.push('is-origin')
 
   return (
-    <span className={classes.join(' ')} style={style} aria-hidden="true">
+    <span
+      className={classes.join(' ')}
+      style={tileStyle(entry)}
+      data-texture={textureOf(entry, 'both')}
+      aria-hidden="true"
+    >
       <span className="tile__glyph">
         <ColorGlyph color={color} />
       </span>
@@ -47,8 +47,8 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     >
       <ol className="rules">
         <li>
-          <strong>Grow your flow.</strong> You start owning the top-left tile — the one with
-          the white ring. Pick a colour and
+          <strong>Grow your flow.</strong> You start owning one tile on the edge of the board — the
+          one with the white ring. Pick a colour and
           your whole region turns that colour, swallowing every tile of that colour touching it.
           Tiles connect <em>up, down, left and right only</em> — never diagonally. Tapping a tile
           on the board is a shortcut for picking its colour.
@@ -79,9 +79,9 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
         <li>
           <LegendTile color={3} owned origin />
           <span>
-            <strong>Your source.</strong> The white ring marks the top-left tile your flow grows
-            from. It is yours from the start and stays yours all level — the ring is just a
-            landmark, it has no other effect.
+            <strong>Your source.</strong> The white ring marks the tile your flow grows from. It
+            sits somewhere on the board's edge, it is yours from the start and it stays yours all
+            level — the ring is just a landmark, it has no other effect.
           </span>
         </li>
         <li>

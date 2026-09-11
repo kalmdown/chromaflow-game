@@ -1,13 +1,17 @@
 import { memo } from 'react'
-import type { CSSProperties, MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
 import { paletteEntry } from '../game/palette.ts'
+import type { ThemeId } from '../game/palette.ts'
 import { ColorGlyph } from './Glyph.tsx'
+import { textureOf, tileStyle } from './tileStyle.ts'
 import { isAbsorbable } from '../game/board.ts'
 import type { BoardState, ColorId, Tile } from '../game/types.ts'
+import type { TileMarks } from '../game/progress.ts'
 
 interface BoardProps {
   board: BoardState
-  showSymbols: boolean
+  theme: ThemeId
+  marks: TileMarks
   /** Indices absorbed by the latest move — they get the pop animation. */
   justAbsorbed: number[]
   shuffling: boolean
@@ -18,7 +22,8 @@ interface BoardProps {
 
 export const Board = memo(function Board({
   board,
-  showSymbols,
+  theme,
+  marks,
   justAbsorbed,
   shuffling,
   disabled,
@@ -44,16 +49,17 @@ export const Board = memo(function Board({
         aspectRatio: `${board.width} / ${board.height}`,
       }}
       role="img"
-      aria-label={describeBoard(board)}
+      aria-label={describeBoard(board, theme)}
       onClick={handleClick}
     >
       {board.tiles.map((tile, index) => (
         <TileView
           key={index}
           tile={tile}
-          isOrigin={index === 0}
+          theme={theme}
+          isOrigin={index === board.origin}
           fresh={fresh.has(index)}
-          showSymbols={showSymbols}
+          marks={marks}
           // A tile is a shortcut to its own colour, unless picking it would be
           // a no-op (already the owned colour) or it is unreachable.
           pickable={!disabled && !tile.owned && isAbsorbable(tile) && tile.color !== board.ownedColor}
@@ -65,17 +71,19 @@ export const Board = memo(function Board({
 
 interface TileProps {
   tile: Tile
+  theme: ThemeId
   isOrigin: boolean
   fresh: boolean
-  showSymbols: boolean
+  marks: TileMarks
   pickable: boolean
 }
 
-function TileView({ tile, isOrigin, fresh, showSymbols, pickable }: TileProps) {
+function TileView({ tile, theme, isOrigin, fresh, marks, pickable }: TileProps) {
   if (tile.kind === 'void') return <div className="tile tile--void" aria-hidden="true" />
 
   const locked = tile.kind === 'lock' && tile.locked === true
-  const entry = paletteEntry(tile.color)
+  const entry = paletteEntry(tile.color, theme)
+  const showSymbols = marks === 'both' || marks === 'symbols'
   const classes = ['tile', `tile--${tile.kind}`]
   if (tile.owned) classes.push('is-owned')
   if (locked) classes.push('is-locked')
@@ -85,16 +93,13 @@ function TileView({ tile, isOrigin, fresh, showSymbols, pickable }: TileProps) {
   if (isOrigin) classes.push('is-origin')
   if (pickable) classes.push('is-pickable')
 
-  const style: CSSProperties | undefined = locked
-    ? undefined
-    : ({
-        '--tile-color': entry.hex,
-        '--tile-shade': entry.shade,
-        '--tile-ink': entry.ink,
-      } as CSSProperties)
-
   return (
-    <div className={classes.join(' ')} style={style} data-pick={pickable ? tile.color : undefined}>
+    <div
+      className={classes.join(' ')}
+      style={locked ? undefined : tileStyle(entry)}
+      data-texture={locked ? undefined : textureOf(entry, marks)}
+      data-pick={pickable ? tile.color : undefined}
+    >
       <span className="tile__face">
         {locked ? (
           <span className="tile__glyph tile__glyph--lock">
@@ -201,7 +206,7 @@ export function ShuffleMark({ size = 15 }: { size?: number }) {
  * Screen-reader summary of the position. The tile mosaic is decorative detail;
  * what matters non-visually is how much is left and what it is made of.
  */
-function describeBoard(board: BoardState): string {
+function describeBoard(board: BoardState, theme: ThemeId): string {
   let owned = 0
   let left = 0
   let locked = 0
@@ -218,7 +223,7 @@ function describeBoard(board: BoardState): string {
   }
   const breakdown = [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([color, count]) => `${count} ${paletteEntry(color).name}`)
+    .map(([color, count]) => `${count} ${paletteEntry(color, theme).name}`)
     .join(', ')
   const lockNote = locked > 0 ? `, ${locked} still locked` : ''
   return `Board: ${owned} tiles in your flow, ${left} remaining${breakdown ? ` (${breakdown})` : ''}${lockNote}.`

@@ -7,9 +7,9 @@ import { Modal } from './Modal.tsx'
 import { Stars } from './Stars.tsx'
 import { SettingsPanel } from './SettingsPanel.tsx'
 import { useLevelSession } from '../hooks/useLevelSession.ts'
-import { LOSS_MESSAGES, computeStars } from '../game/engine.ts'
+import { LOSS_MESSAGES, LOSS_TITLES, computeStars } from '../game/engine.ts'
 import { countUnowned } from '../game/board.ts'
-import { paletteEntry } from '../game/palette.ts'
+import { getTheme, paletteEntry } from '../game/palette.ts'
 import { ColorGlyph } from './Glyph.tsx'
 import type { LevelDefinition } from '../game/types.ts'
 import type { LevelRecord, Settings } from '../game/progress.ts'
@@ -51,10 +51,10 @@ export function GameScreen({
   const session = useLevelSession(level, reducedMotion)
   const { state, flash, busy, canUndo, choose, undo, restart } = session
   const [dialog, setDialog] = useState<Dialog>('none')
-  const [hintOpen, setHintOpen] = useState(true)
   const reportedRef = useRef<string>('')
 
-  const target = paletteEntry(level.targetColor)
+  const theme = getTheme(level.theme)
+  const target = paletteEntry(level.targetColor, level.theme)
   const remaining = countUnowned(state.board)
   const stars = computeStars(state)
   const over = state.status !== 'playing'
@@ -73,6 +73,18 @@ export function GameScreen({
       flawless: !state.usedUndo,
     })
   }, [state, level.id, onWin])
+
+  // The page glow behind the board takes the level's colours. It lives on
+  // <html> because the body background is fixed, so the vars are reset on exit.
+  useEffect(() => {
+    const root = document.documentElement.style
+    root.setProperty('--bg-glow-a', theme.glow[0])
+    root.setProperty('--bg-glow-b', theme.glow[1])
+    return () => {
+      root.removeProperty('--bg-glow-a')
+      root.removeProperty('--bg-glow-b')
+    }
+  }, [theme])
 
   // Keyboard controls. Dialogs swallow everything except their own Escape.
   useEffect(() => {
@@ -114,7 +126,7 @@ export function GameScreen({
     <main className="screen screen--game" style={headStyle}>
       <header className="hud card">
         <div className="hud__top">
-          <button type="button" className="icon-button" onClick={onExit} aria-label="Back to level select">
+          <button type="button" className="icon-button" onClick={onExit} aria-label="Back to levels">
             ←
           </button>
           <div className="hud__title">
@@ -158,23 +170,18 @@ export function GameScreen({
         )}
       </header>
 
-      {level.hint && hintOpen && (
-        <div className="hint card">
-          <p>{level.hint}</p>
-          <button
-            type="button"
-            className="button button--ghost button--small"
-            onClick={() => setHintOpen(false)}
-          >
-            Dismiss
-          </button>
-        </div>
+      {level.hint && (
+        <aside className={`hint hint--${level.hint.kind} card`}>
+          <span className="hint__kind">{level.hint.kind === 'rule' ? 'Rule' : 'Tip'}</span>
+          <p>{level.hint.text}</p>
+        </aside>
       )}
 
       <div className="board-wrap">
         <Board
           board={state.board}
-          showSymbols={settings.showSymbols}
+          theme={level.theme}
+          marks={settings.tileMarks}
           justAbsorbed={session.justAbsorbed}
           shuffling={flash?.shuffled === true && !reducedMotion}
           disabled={busy || over}
@@ -203,6 +210,8 @@ export function GameScreen({
 
       <ColorPalette
         colors={level.colors}
+        theme={level.theme}
+        marks={settings.tileMarks}
         board={state.board}
         targetColor={level.targetColor}
         disabled={busy || over}
@@ -239,7 +248,7 @@ export function GameScreen({
           footer={
             <>
               <button type="button" className="button" onClick={onExit}>
-                Level select
+                Levels
               </button>
               <button
                 type="button"
@@ -260,7 +269,7 @@ export function GameScreen({
 
       {dialog === 'restart' && (
         <Modal
-          title="Restart level?"
+          title="Start over?"
           onClose={() => setDialog('none')}
           footer={
             <>
@@ -280,13 +289,13 @@ export function GameScreen({
             </>
           }
         >
-          <p>Your progress on this attempt will be discarded and the board reset.</p>
+          <p>This run gets wiped — the board, your score and your turns all go back to the start.</p>
         </Modal>
       )}
 
       {state.status === 'won' && dialog === 'none' && (
         <Modal
-          title="Level complete"
+          title={stars === 3 ? 'Perfect run!' : 'Level clear!'}
           tone="win"
           footer={
             <>
@@ -328,13 +337,13 @@ export function GameScreen({
             </dl>
             <p className="result__note">
               {state.usedUndo
-                ? 'Undo was used, so no flawless badge this run.'
-                : 'Flawless — cleared without a single undo.'}
+                ? 'You used an undo, so no flawless badge this time.'
+                : 'Flawless — not a single undo.'}
             </p>
             {stars < 3 && (
               <p className="result__note result__note--dim">
-                Three stars need {level.starScore[1].toLocaleString()} points with{' '}
-                {level.starTurns[1]} turn{level.starTurns[1] === 1 ? '' : 's'} to spare.
+                Going for 3 stars? {level.starScore[1].toLocaleString()} points with{' '}
+                {level.starTurns[1]} turn{level.starTurns[1] === 1 ? '' : 's'} to spare does it.
               </p>
             )}
           </div>
@@ -343,31 +352,31 @@ export function GameScreen({
 
       {state.status === 'lost' && dialog === 'none' && (
         <Modal
-          title="Level failed"
+          title={state.lossReason ? LOSS_TITLES[state.lossReason] : 'Run over'}
           tone="loss"
           footer={
             <>
               <button type="button" className="button" onClick={onExit}>
-                Level select
+                Levels
               </button>
               {canUndo && (
                 <button type="button" className="button" onClick={undo}>
-                  ↶ Undo last move
+                  ↶ Undo
                 </button>
               )}
               <button type="button" className="button button--primary" onClick={restart}>
-                Restart
+                Try again
               </button>
             </>
           }
         >
           <p className="result__reason">
-            {state.lossReason ? LOSS_MESSAGES[state.lossReason] : 'The level ended.'}
+            {state.lossReason ? LOSS_MESSAGES[state.lossReason] : 'That run is over.'}
           </p>
           <p className="result__note result__note--dim">
             {remaining > 0
-              ? `${remaining} tile${remaining === 1 ? '' : 's'} were still unclaimed.`
-              : 'The board was full, but not on the target colour.'}
+              ? `${remaining} tile${remaining === 1 ? '' : 's'} still out there.`
+              : 'Every tile absorbed — just the wrong colour at the finish.'}
           </p>
         </Modal>
       )}

@@ -15,9 +15,11 @@ export interface LevelRecord {
   flawless: boolean
 }
 
+/** Which colour-blind-safe marks the tiles carry on top of their hue. */
+export type TileMarks = 'both' | 'symbols' | 'textures' | 'none'
+
 export interface Settings {
-  /** Draw the per-colour glyphs on every tile. */
-  showSymbols: boolean
+  tileMarks: TileMarks
   /** 'system' follows prefers-reduced-motion. */
   motion: 'system' | 'full' | 'reduced'
 }
@@ -30,7 +32,7 @@ export interface SaveData {
   seenHowTo: boolean
 }
 
-export const DEFAULT_SETTINGS: Settings = { showSymbols: true, motion: 'system' }
+export const DEFAULT_SETTINGS: Settings = { tileMarks: 'both', motion: 'system' }
 
 export function emptySave(): SaveData {
   return { version: 1, records: {}, settings: { ...DEFAULT_SETTINGS }, lastLevel: 1, seenHowTo: false }
@@ -45,12 +47,22 @@ export function loadSave(): SaveData {
     return {
       version: 1,
       records: sanitiseRecords(parsed.records),
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings: migrateSettings(parsed.settings),
       lastLevel: typeof parsed.lastLevel === 'number' ? parsed.lastLevel : 1,
       seenHowTo: parsed.seenHowTo === true,
     }
   } catch {
     return emptySave()
+  }
+}
+
+function migrateSettings(stored: Partial<Settings> | undefined): Settings {
+  // Saves from before textures existed carried a single `showSymbols` switch.
+  const legacy = stored as (Partial<Settings> & { showSymbols?: boolean }) | undefined
+  return {
+    tileMarks:
+      legacy?.tileMarks ?? (legacy?.showSymbols === false ? 'none' : DEFAULT_SETTINGS.tileMarks),
+    motion: legacy?.motion ?? DEFAULT_SETTINGS.motion,
   }
 }
 

@@ -5,6 +5,8 @@
  * calls into these functions and renders whatever comes back.
  */
 
+import type { ThemeId } from './palette.ts'
+
 /** Index into the active palette. Levels use between 5 and 7 colors. */
 export type ColorId = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
@@ -44,6 +46,8 @@ export interface BoardState {
   ownedColor: ColorId
   /** Key groups collected so far. */
   unlockedGroups: number[]
+  /** Index of the tile the flow grows from. */
+  origin: number
 }
 
 export type GameStatus = 'playing' | 'won' | 'lost'
@@ -53,9 +57,17 @@ export type LossReason =
   | 'target-exhausted'
   | 'wrong-final-color'
 
+/** Shown above the board. A rule introduces a mechanic; a tip is only advice. */
+export interface LevelHint {
+  kind: 'rule' | 'tip'
+  text: string
+}
+
 export interface LevelDefinition {
   id: number
   name: string
+  /** Colour theme keyed to the level's name — see `palette.ts`. */
+  theme: ThemeId
   width: number
   height: number
   /** Palette subset in play, e.g. `[0,1,2,3,4]`. */
@@ -64,14 +76,15 @@ export interface LevelDefinition {
   turnLimit: number
   /** Row strings of whitespace-separated cell tokens — see `parseBoard`. */
   rows: string[]
+  /** Tile the flow grows from, as `[x, y]`. Defaults to the top-left corner. */
+  origin?: [number, number]
   /** Seed for the deterministic shuffle-tile RNG. */
   seed: number
   /** Score needed for the 2nd and 3rd star. */
   starScore: [number, number]
   /** Turns that must remain for the 2nd and 3rd star. */
   starTurns: [number, number]
-  /** Shown once, above the board, the first time a level is opened. */
-  hint?: string
+  hint?: LevelHint
   /** Reference solution found by the solver — used by the level validator. */
   solution?: ColorId[]
 }

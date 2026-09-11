@@ -21,18 +21,27 @@ export function parseBoard(level: LevelDefinition): BoardState {
     }
     for (const cell of cells) tiles.push(parseCell(cell, level))
   }
+  const origin = originIndex(level)
   const board: BoardState = {
     width: level.width,
     height: level.height,
     tiles,
-    ownedColor: tiles[0].color,
+    ownedColor: tiles[origin].color,
     unlockedGroups: [],
+    origin,
   }
-  if (tiles[0].kind === 'void' || tiles[0].kind === 'lock') {
-    throw new Error(`Level ${level.id}: the origin tile (0,0) must be playable`)
+  if (tiles[origin].kind === 'void' || tiles[origin].kind === 'lock') {
+    const [x, y] = level.origin ?? [0, 0]
+    throw new Error(`Level ${level.id}: the origin tile (${x},${y}) must be playable`)
   }
   claimOrigin(board)
   return board
+}
+
+/** Row-major index of the tile the flow grows from. */
+export function originIndex(level: Pick<LevelDefinition, 'width' | 'origin'>): number {
+  const [x, y] = level.origin ?? [0, 0]
+  return y * level.width + x
 }
 
 function parseCell(cell: string, level: LevelDefinition): Tile {
@@ -64,9 +73,9 @@ function toColor(raw: string, level: LevelDefinition): ColorId {
   return value
 }
 
-/** Seeds the flow region from (0,0) and absorbs its same-coloured neighbours. */
+/** Seeds the flow region from the origin and absorbs its same-coloured neighbours. */
 function claimOrigin(board: BoardState): void {
-  board.tiles[0].owned = true
+  board.tiles[board.origin].owned = true
   absorbConnected(board, board.ownedColor)
 }
 
@@ -77,6 +86,7 @@ export function cloneBoard(board: BoardState): BoardState {
     tiles: board.tiles.map((t) => ({ ...t })),
     ownedColor: board.ownedColor,
     unlockedGroups: board.unlockedGroups.slice(),
+    origin: board.origin,
   }
 }
 

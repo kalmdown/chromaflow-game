@@ -234,9 +234,16 @@ export function computeStars(state: GameState): 1 | 2 | 3 {
   return stars as 1 | 2 | 3
 }
 
+/** Headline for the end-of-run panel — upbeat, never scolding. */
+export const LOSS_TITLES: Record<NonNullable<GameState['lossReason']>, string> = {
+  'out-of-turns': 'Out of turns!',
+  'target-exhausted': 'No target tiles left',
+  'wrong-final-color': 'So close!',
+}
+
 export const LOSS_MESSAGES: Record<NonNullable<GameState['lossReason']>, string> = {
-  'out-of-turns': 'You ran out of turns before the board was fully absorbed.',
+  'out-of-turns': 'The board still has tiles on it and there are no turns left.',
   'target-exhausted':
-    'The last unclaimed tiles of the target colour were absorbed too early. Keep at least one target tile on the board until the very last move.',
-  'wrong-final-color': 'The board is full, but your flow ended on the wrong colour.',
+    'You swallowed the last free target tiles too early. Save one for the very last move and the board is yours.',
+  'wrong-final-color': 'You filled the board, but your flow finished on the wrong colour.',
 }

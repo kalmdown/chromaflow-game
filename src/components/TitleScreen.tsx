@@ -49,7 +49,7 @@ export function TitleScreen({
             {continueLabel}
           </button>
           <button type="button" className="button" onClick={onLevels}>
-            Level select
+            Levels
           </button>
           <button type="button" className="button" onClick={onHowToPlay}>
             How to play

@@ -40,6 +40,7 @@ interface Row {
 function trial(shape: Shape, size: number, seed: number): Row | null {
   const spec: LevelSpec = {
     name: shape,
+    theme: 'spectrum',
     width: size,
     height: size,
     colors: COLORS,
@@ -57,12 +58,14 @@ function trial(shape: Shape, size: number, seed: number): Row | null {
   const level: LevelDefinition = {
     id: 0,
     name: shape,
+    theme: 'spectrum',
     width: size,
     height: size,
     colors: COLORS,
     targetColor: 2,
     turnLimit: size * size,
     rows: buildTokens(spec, built.grid, built.seed).rows,
+    origin: built.grid.origin,
     seed,
     starScore: [0, 0],
     starTurns: [0, 0],

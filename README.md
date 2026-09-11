@@ -1,6 +1,6 @@
 # Chromaflow
 
-A turn-limited colour flood puzzle for the browser. You own the top-left tile;
+A turn-limited colour flood puzzle for the browser. You own one tile on the board's rim;
 each turn you pick a colour, your whole region becomes that colour and swallows
 every connected tile of it. Clear the board before your turns run out — and land
 on the level's target colour with your last move.
@@ -29,6 +29,7 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 | `npm run levels:build` | Dev-only: regenerate `src/game/levels.ts` from the specs in `scripts/generate-levels.ts` |
 | `npm run levels:analyze` | Dev-only: difficulty profile of every level — forced moves, grind moves, options per move |
 | `npm run levels:shapes` | Dev-only: build each shape at 8×8–12×12 and report how the results play |
+| `npm run levels:origins` | Dev-only: hold each board fixed and move only the origin — rim, centre, random — to see what the start does to a level |
 
 ## Rules
 
@@ -53,9 +54,11 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 Two independent axes, both set per level in `scripts/generate-levels.ts`.
 
 **Shape** — the board outline. Holes (`void` tiles) are never playable and never
-counted; the generator rejects any mask that would disconnect the board, and
-carves a one-tile inlet along the top edge if a corner cut would strand the
-origin at (0,0).
+counted, and the generator rejects any mask that would disconnect the board.
+The origin — the tile the flow grows from — is drawn from the shape's *rim*: the
+playable tiles furthest from everything else by walking distance, skipping any
+with a single way out. Each level records it as `origin: [x, y]` (top-left when
+omitted).
 
 Every shape other than `full` changes how the flow can route — a hole that only
 trims tiles off a far corner is decoration, not design.
@@ -195,17 +198,27 @@ colour is adjacent to the owned region.*
 - **Solvable is the floor, not the bar.** A board can be perfectly winnable and
   still open with three forced clicks and a run of two-tile nibbles. Generation
   therefore also gates on how the reference solution *plays*: the opening move
-  must absorb at least three tiles, at most three moves may have a single live
-  option, and at most a quarter may absorb two tiles or fewer. `levels:analyze`
+  must absorb at least three tiles and be a real choice, at most two moves may
+  have a single live option, and at most a quarter may absorb two tiles or
+  fewer. `levels:analyze`
   reports the same numbers for the shipped catalogue, so a regression shows up
   as a flagged row rather than as a level that merely feels bad.
-- **Corner cuts get a bay, not a corridor.** When a mask bites off the corner
-  containing the origin, opening a one-tile channel to the body is the obvious
-  repair and the wrong one — a corridor one tile wide has exactly one colour at
-  each step, so every move through it is forced. `carveBay` instead opens the
-  whole corner triangle up to the body's nearest diagonal, meeting it across a
-  wide front. On Atoll that change alone took the level from four forced moves
-  and six grind moves to two and one.
+- **The origin sits on the rim, never in a repair.** Early builds pinned the
+  origin to (0,0) and reconnected it whenever a mask bit off that corner —
+  first with a one-tile corridor (every move through it forced), then with a
+  carved bay. Both bolted something onto the shape that was not the shape. The
+  origin study (`levels:origins`) showed that the start's eccentricity is what
+  sets a level's length — a centre start shortens solutions by two moves and up
+  to eight on the big boards — and that every shape's natural start was already
+  a rim tile. So the generator now draws the origin from the rim and nothing is
+  carved: the cross starts on an arm, the atoll on the ring.
+- **Locks are placed by walking distance and checked for reachability.**
+  Manhattan distance from a corner was the old yardstick, which broke the moment
+  the origin moved — from the board's centre no tile was ever "far", and lock
+  groups were silently dropped on a third of the levels. Placement now uses BFS
+  distance from the actual origin, scaled to its reach, and a cluster is undone
+  if it leaves its own key — or an earlier group's — unreachable without
+  crossing a lock. A five-lock cluster can sever a ring; this is what stops it.
 - **The catalogue is generated, then frozen.** `scripts/generate-levels.ts` lays
   out each board from a hand-tuned spec (size, palette, layout family, shape
   mask, special-tile plan), searches for a real solution with the engine itself,

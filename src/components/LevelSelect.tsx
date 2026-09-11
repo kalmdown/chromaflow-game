@@ -28,7 +28,7 @@ export function LevelSelect({ save, onPlay, onBack }: LevelSelectProps) {
         {LEVELS.map((level) => {
           const record = save.records[String(level.id)]
           const unlocked = isUnlocked(save, level.id)
-          const target = paletteEntry(level.targetColor)
+          const target = paletteEntry(level.targetColor, level.theme)
           const style = { '--tile-color': target.hex, '--tile-shade': target.shade } as CSSProperties
 
           return (
@@ -52,6 +52,15 @@ export function LevelSelect({ save, onPlay, onBack }: LevelSelectProps) {
                 <span className="level-card__name">{unlocked ? level.name : 'Locked'}</span>
                 {unlocked ? (
                   <>
+                    <span className="level-card__palette" aria-hidden="true">
+                      {level.colors.map((color) => (
+                        <span
+                          key={color}
+                          className={`level-card__dot${color === level.targetColor ? ' is-target' : ''}`}
+                          style={{ background: paletteEntry(color, level.theme).hex }}
+                        />
+                      ))}
+                    </span>
                     <span className="level-card__meta">
                       <span className="level-card__target">
                         <ColorGlyph color={level.targetColor} />

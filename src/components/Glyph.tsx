@@ -1,14 +1,8 @@
 import type { ColorId } from '../game/types.ts'
 import { paletteEntry } from '../game/palette.ts'
+import type { GlyphShape } from '../game/palette.ts'
 
-export type GlyphShape =
-  | 'circle'
-  | 'triangle'
-  | 'square'
-  | 'diamond'
-  | 'star'
-  | 'plus'
-  | 'hexagon'
+export type { GlyphShape }
 
 /**
  * Colour-blind-safe shape marks, drawn rather than typed.

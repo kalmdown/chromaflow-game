@@ -14,7 +14,8 @@
     "levels:build": "tsx scripts/generate-levels.ts",
     "levels:validate": "tsx scripts/validate-levels.ts",
     "levels:analyze": "tsx scripts/analyze-levels.ts",
-    "levels:shapes": "tsx scripts/analyze-shapes.ts"
+    "levels:shapes": "tsx scripts/analyze-shapes.ts",
+    "levels:origins": "tsx scripts/analyze-origins.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

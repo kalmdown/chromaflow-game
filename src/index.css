@@ -392,6 +392,23 @@ p {
   font-weight: 700;
 }
 
+/* The level's own colours, so the theme reads before the board does. */
+.level-card__palette {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.level-card__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.level-card__dot.is-target {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3px rgb(255 255 255 / 0.7);
+}
+
 .level-card__meta {
   font-size: 0.78rem;
   color: var(--ink-dim);
@@ -568,12 +585,32 @@ p {
   text-align: center;
 }
 
+/* Rules introduce a mechanic and are amber; tips are advice and stay teal. */
 .hint {
+  --hint-color: var(--accent);
   padding: 9px 12px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  border-left: 3px solid var(--accent);
+  align-items: flex-start;
+  gap: 10px;
+  border-left: 3px solid var(--hint-color);
+}
+
+.hint--rule {
+  --hint-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, var(--card));
+}
+
+.hint__kind {
+  flex: none;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hint-color);
+  border: 1px solid color-mix(in srgb, var(--hint-color) 45%, transparent);
+  border-radius: 999px;
+  padding: 2px 7px;
 }
 
 .hint p {
@@ -581,6 +618,10 @@ p {
   font-size: 0.85rem;
   color: var(--ink-dim);
   flex: 1;
+}
+
+.hint--rule p {
+  color: var(--ink);
 }
 
 /* --------------------------------------------------------------- board --- */
@@ -638,6 +679,76 @@ p {
 .tile--void {
   background: none;
   box-shadow: none;
+}
+
+/* ------------------------------------------------------------ textures --- */
+
+/* A faint surface pattern per colour slot, drawn in the slot's own ink so it
+   shows on light and dark hues alike. Applies to anything painted with the
+   tile custom properties: tiles, palette swatches and legend chips. */
+[data-texture] {
+  --tx: color-mix(in srgb, var(--tile-ink) 17%, transparent);
+  --tx-line: 1.5px;
+  --tx-pitch: clamp(5px, 1.3vw, 8px);
+}
+
+[data-texture]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--tx-image);
+  background-size: var(--tx-size, auto);
+}
+
+[data-texture='stripes'] {
+  --tx-image: repeating-linear-gradient(
+    135deg,
+    var(--tx) 0 var(--tx-line),
+    transparent var(--tx-line) var(--tx-pitch)
+  );
+}
+
+[data-texture='dots'] {
+  --tx-image: radial-gradient(circle, var(--tx) 28%, transparent 32%);
+  --tx-size: var(--tx-pitch) var(--tx-pitch);
+}
+
+[data-texture='grid'] {
+  --tx-image:
+    linear-gradient(var(--tx) var(--tx-line), transparent var(--tx-line)),
+    linear-gradient(90deg, var(--tx) var(--tx-line), transparent var(--tx-line));
+  --tx-size: var(--tx-pitch) var(--tx-pitch);
+}
+
+[data-texture='lines'] {
+  --tx-image: repeating-linear-gradient(
+    180deg,
+    var(--tx) 0 var(--tx-line),
+    transparent var(--tx-line) var(--tx-pitch)
+  );
+}
+
+[data-texture='checks'] {
+  --tx-image: conic-gradient(var(--tx) 25%, transparent 0 50%, var(--tx) 0 75%, transparent 0);
+  --tx-size: calc(var(--tx-pitch) * 2) calc(var(--tx-pitch) * 2);
+}
+
+[data-texture='columns'] {
+  --tx-image: repeating-linear-gradient(
+    90deg,
+    var(--tx) 0 var(--tx-line),
+    transparent var(--tx-line) var(--tx-pitch)
+  );
+}
+
+[data-texture='rings'] {
+  --tx-image: repeating-radial-gradient(
+    circle at 50% 50%,
+    var(--tx) 0 var(--tx-line),
+    transparent var(--tx-line) var(--tx-pitch)
+  );
 }
 
 .tile__face {
@@ -877,7 +988,7 @@ p {
   font: inherit;
   cursor: pointer;
   min-height: 64px;
-  padding: 7px 5px 5px;
+  padding: 7px 3px 5px;
   border-radius: var(--radius-md);
   border: 2px solid rgb(255 255 255 / 0.16);
   background: linear-gradient(170deg, var(--tile-color), var(--tile-shade));
@@ -912,11 +1023,17 @@ p {
   filter: grayscale(0.35);
 }
 
+/* The target is a destination marker, not a live-interaction ring like the
+   board's solid white glow: a dashed border plus the pill label. */
 .swatch.is-target {
-  border-color: rgb(255 255 255 / 0.9);
-  box-shadow:
-    0 0 0 2px rgb(0 0 0 / 0.35),
-    0 8px 20px -12px var(--tile-color);
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 0.85);
+}
+
+/* Reaching the target colour is the goal — never wash it out. */
+.swatch.is-current.is-target {
+  opacity: 1;
+  filter: none;
 }
 
 .swatch.is-target::after {
@@ -954,8 +1071,13 @@ p {
 }
 
 .swatch__name {
-  font-size: 0.8rem;
+  font-size: clamp(0.62rem, 3.2vw, 0.8rem);
   font-weight: 700;
+  letter-spacing: -0.01em;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .swatch__count {
@@ -996,6 +1118,7 @@ p {
 }
 
 .modal {
+  container-type: inline-size;
   width: min(100%, 460px);
   max-height: min(88dvh, 760px);
   overflow: auto;
@@ -1054,6 +1177,15 @@ p {
   gap: 8px;
   padding: 14px 16px 16px;
   background: linear-gradient(180deg, transparent, var(--card) 40%);
+}
+
+/* Narrow panels cannot hold three actions at their natural width. Let the
+   buttons share whatever row they land on, so a wrapped one fills its line
+   instead of hanging off the end as a ragged single. */
+@container (max-width: 419px) {
+  .modal__foot > * {
+    flex: 1 1 auto;
+  }
 }
 
 .rules {

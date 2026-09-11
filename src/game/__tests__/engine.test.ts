@@ -9,6 +9,7 @@ function level(rows: string[], overrides: Partial<LevelDefinition> = {}): LevelD
   return {
     id: 999,
     name: 'test',
+    theme: 'spectrum',
     width,
     height: rows.length,
     colors: [0, 1, 2, 3, 4],
@@ -296,5 +297,17 @@ describe('board parsing', () => {
 
   it('rejects an unplayable origin', () => {
     expect(() => createGame(level(['. 1', '1 1']))).toThrow(/origin tile/)
+  })
+
+  it('seeds the flow from a level-defined origin instead of (0,0)', () => {
+    const game = createGame(level(['. 2 2', '1 1 2', '1 0 0'], { origin: [1, 0] }))
+    expect(game.board.origin).toBe(1)
+    expect(game.board.ownedColor).toBe(2)
+    expect(game.board.tiles.filter((t) => t.owned)).toHaveLength(3)
+    expect(game.board.tiles[3].owned).toBe(false)
+  })
+
+  it('rejects a level-defined origin on a void tile', () => {
+    expect(() => createGame(level(['1 .', '1 1'], { origin: [1, 0] }))).toThrow(/origin tile \(1,0\)/)
   })
 })

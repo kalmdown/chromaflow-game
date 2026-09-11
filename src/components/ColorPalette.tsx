@@ -1,11 +1,15 @@
-import type { CSSProperties } from 'react'
 import { paletteEntry } from '../game/palette.ts'
+import type { ThemeId } from '../game/palette.ts'
 import { ColorGlyph } from './Glyph.tsx'
+import { textureOf, tileStyle } from './tileStyle.ts'
 import type { BoardState, ColorId } from '../game/types.ts'
+import type { TileMarks } from '../game/progress.ts'
 import { countAvailableColor } from '../game/board.ts'
 
 interface ColorPaletteProps {
   colors: ColorId[]
+  theme: ThemeId
+  marks: TileMarks
   board: BoardState
   targetColor: ColorId
   disabled: boolean
@@ -14,6 +18,8 @@ interface ColorPaletteProps {
 
 export function ColorPalette({
   colors,
+  theme,
+  marks,
   board,
   targetColor,
   disabled,
@@ -22,22 +28,18 @@ export function ColorPalette({
   return (
     <div className="palette" role="group" aria-label="Choose a colour">
       {colors.map((color, index) => {
-        const entry = paletteEntry(color)
+        const entry = paletteEntry(color, theme)
         const isCurrent = color === board.ownedColor
         const remaining = countAvailableColor(board, color)
         const isTarget = color === targetColor
-        const style = {
-          '--tile-color': entry.hex,
-          '--tile-shade': entry.shade,
-          '--tile-ink': entry.ink,
-        } as CSSProperties
 
         return (
           <button
             key={color}
             type="button"
             className={`swatch${isCurrent ? ' is-current' : ''}${isTarget ? ' is-target' : ''}`}
-            style={style}
+            style={tileStyle(entry)}
+            data-texture={textureOf(entry, marks)}
             disabled={disabled || isCurrent}
             onClick={() => onPick(color)}
             aria-keyshortcuts={String(index + 1)}

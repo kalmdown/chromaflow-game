@@ -1,4 +1,11 @@
-import type { Settings } from '../game/progress.ts'
+import type { Settings, TileMarks } from '../game/progress.ts'
+
+const MARK_OPTIONS: readonly [TileMarks, string][] = [
+  ['both', 'Symbols and textures'],
+  ['symbols', 'Symbols only'],
+  ['textures', 'Textures only'],
+  ['none', 'Colour alone'],
+]
 
 interface SettingsPanelProps {
   settings: Settings
@@ -8,17 +15,24 @@ interface SettingsPanelProps {
 export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
   return (
     <div className="settings">
-      <label className="settings__row">
-        <input
-          type="checkbox"
-          checked={settings.showSymbols}
-          onChange={(event) => onChange({ ...settings, showSymbols: event.target.checked })}
-        />
-        <span>
-          <strong>Colour symbols on tiles</strong>
-          <small>Each colour carries its own glyph, so the board never relies on hue alone.</small>
-        </span>
-      </label>
+      <fieldset className="settings__row settings__row--group">
+        <legend>
+          <strong>Tile marks</strong>
+          <small>Each colour carries its own glyph and surface pattern, so the board never relies on hue alone.</small>
+        </legend>
+        {MARK_OPTIONS.map(([value, label]) => (
+          <label key={value} className="settings__radio">
+            <input
+              type="radio"
+              name="tile-marks"
+              value={value}
+              checked={settings.tileMarks === value}
+              onChange={() => onChange({ ...settings, tileMarks: value })}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </fieldset>
 
       <fieldset className="settings__row settings__row--group">
         <legend>

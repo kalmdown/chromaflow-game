@@ -15,7 +15,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { findSolution, profileSolution } from '../src/game/solver.ts'
 import { nextInt, nextRandom } from '../src/game/rng.ts'
-import type { ColorId, LevelDefinition } from '../src/game/types.ts'
+import { originIndex } from '../src/game/board.ts'
+import type { ColorId, LevelDefinition, LevelHint } from '../src/game/types.ts'
+import type { ThemeId } from '../src/game/palette.ts'
 
 export type Layout =
   | 'blobs'
@@ -45,6 +47,7 @@ interface SpecialPlan {
 
 export interface LevelSpec {
   name: string
+  theme: ThemeId
   width: number
   height: number
   colors: ColorId[]
@@ -56,113 +59,122 @@ export interface LevelSpec {
   slack: number
   /** Acceptable reference-solution length; the seed is re-rolled to hit it. */
   moves: [number, number]
+  /**
+   * Where the flow starts. `rim` (default) is a seeded draw from the board's
+   * rim; `corner` pins it to the top-left so the tutorial levels all start in
+   * the same place the how-to-play describes.
+   */
+  origin?: 'rim' | 'corner'
   specials?: SpecialPlan
-  hint?: string
+  /** A mechanic this level introduces — shown as a rule. */
+  rule?: string
+  /** Advice — shown as a tip. */
+  tip?: string
 }
 
 const FIVE: ColorId[] = [0, 1, 2, 3, 4]
 const SIX: ColorId[] = [0, 1, 2, 3, 4, 5]
 const SEVEN: ColorId[] = [0, 1, 2, 3, 4, 5, 6]
 
-const SPECS: LevelSpec[] = [
+export const SPECS: LevelSpec[] = [
   // 1-3 - basic flood-fill, forgiving.
   {
-    name: 'First Ripple', width: 8, height: 8, colors: FIVE, target: 2,
-    layout: 'blobs', shape: 'full', seed: 1041, slack: 5, moves: [6, 10],
-    hint: 'Pick a colour. Your region takes it and swallows every touching tile of that colour.',
+    name: 'First Ripple', theme: 'tide', width: 8, height: 8, colors: FIVE, target: 2,
+    layout: 'blobs', shape: 'full', seed: 1041, origin: 'corner', slack: 5, moves: [6, 10],
+    rule: 'Pick a colour. Your region takes it and swallows every touching tile of that colour.',
   },
   {
-    name: 'Open Water', width: 8, height: 8, colors: FIVE, target: 4,
-    layout: 'blobs', shape: 'full', seed: 2207, slack: 5, moves: [7, 11],
-    hint: 'Big absorptions are worth more. Four tiles or more in one turn starts a combo.',
+    name: 'Open Water', theme: 'tide', width: 8, height: 8, colors: FIVE, target: 4,
+    layout: 'blobs', shape: 'full', seed: 2207, origin: 'corner', slack: 5, moves: [7, 11],
+    rule: 'Big absorptions are worth more. Four tiles or more in one turn starts a combo.',
   },
   {
-    name: 'Slow Tide', width: 8, height: 8, colors: FIVE, target: 0,
-    layout: 'bands', shape: 'full', seed: 3313, slack: 4, moves: [7, 12],
-    hint: 'Bands fall fastest when you work along them instead of across them.',
+    name: 'Slow Tide', theme: 'tide', width: 8, height: 8, colors: FIVE, target: 0,
+    layout: 'bands', shape: 'full', seed: 3313, origin: 'corner', slack: 4, moves: [7, 12],
+    tip: 'Bands fall fastest when you work along them instead of across them.',
   },
 
   // 4-6 - the final-colour rule, taught explicitly.
   {
-    name: 'Save the Last Drop', width: 8, height: 8, colors: FIVE, target: 3,
-    layout: 'blobs', shape: 'full', seed: 4127, slack: 4, moves: [7, 12],
-    hint: 'New rule: your flow must FINISH on the target colour, so keep target tiles on the board until the end.',
+    name: 'Save the Last Drop', theme: 'reservoir', width: 8, height: 8, colors: FIVE, target: 3,
+    layout: 'blobs', shape: 'full', seed: 4127, origin: 'corner', slack: 4, moves: [7, 12],
+    rule: 'Your flow must FINISH on the target colour, so keep target tiles on the board until the end.',
   },
   {
-    name: 'Held Back', width: 9, height: 9, colors: FIVE, target: 1,
-    layout: 'patchwork', shape: 'full', seed: 5231, slack: 4, moves: [8, 13],
-    hint: 'If you absorb the very last unclaimed target tiles while others remain, the level is lost.',
+    name: 'Held Back', theme: 'reservoir', width: 9, height: 9, colors: FIVE, target: 1,
+    layout: 'patchwork', shape: 'full', seed: 5231, origin: 'corner', slack: 4, moves: [8, 13],
+    rule: 'If you absorb the very last unclaimed target tiles while others remain, the level is lost.',
   },
   {
-    name: 'Reserve', width: 9, height: 9, colors: FIVE, target: 4,
-    layout: 'rings', shape: 'full', seed: 6421, slack: 3, moves: [8, 14],
-    hint: 'Count the target tiles before you commit. One of them has to survive to the final move.',
+    name: 'Reserve', theme: 'reservoir', width: 9, height: 9, colors: FIVE, target: 4,
+    layout: 'rings', shape: 'full', seed: 6421, origin: 'corner', slack: 3, moves: [8, 14],
+    tip: 'Count the target tiles before you commit. One of them has to survive to the final move.',
   },
 
   // 7-10 - tighter budgets, shaped boards.
   {
-    name: 'Narrow Channel', width: 9, height: 9, colors: SIX, target: 5,
+    name: 'Narrow Channel', theme: 'canyon', width: 9, height: 9, colors: SIX, target: 5,
     layout: 'blobs', shape: 'serpentine', seed: 7013, slack: 3, moves: [9, 16],
   },
   {
-    name: 'Atoll', width: 11, height: 11, colors: SIX, target: 2,
+    name: 'Atoll', theme: 'atoll', width: 11, height: 11, colors: SIX, target: 2,
     layout: 'rings', shape: 'atoll', seed: 8117, slack: 3, moves: [8, 15],
   },
   {
-    name: 'Crossflow', width: 10, height: 10, colors: SIX, target: 0,
+    name: 'Crossflow', theme: 'canyon', width: 10, height: 10, colors: SIX, target: 0,
     layout: 'quadrants', shape: 'cross', seed: 9227, slack: 3, moves: [9, 17],
   },
   {
-    name: 'Hourglass', width: 11, height: 11, colors: SIX, target: 3,
+    name: 'Hourglass', theme: 'dunes', width: 11, height: 11, colors: SIX, target: 3,
     layout: 'gradient', shape: 'hourglass', seed: 10333, slack: 3, moves: [9, 16],
   },
 
   // 11-14 - keys and locks.
   {
-    name: 'Iron Gate', width: 9, height: 9, colors: FIVE, target: 2,
+    name: 'Iron Gate', theme: 'forge', width: 9, height: 9, colors: FIVE, target: 2,
     layout: 'blobs', shape: 'full', seed: 11071, slack: 4, moves: [8, 15],
     specials: { lockGroups: 1, lockClusterSize: 5 },
-    hint: 'Grey tiles are locked. Absorb the matching key tile to open them.',
+    rule: 'Grey tiles are locked. Absorb the matching key tile to open them.',
   },
   {
-    name: 'Two Keys', width: 10, height: 10, colors: FIVE, target: 1,
+    name: 'Two Keys', theme: 'forge', width: 10, height: 10, colors: FIVE, target: 1,
     layout: 'patchwork', shape: 'full', seed: 12157, slack: 3, moves: [10, 17],
     specials: { lockGroups: 2, lockClusterSize: 4 },
-    hint: 'Each key opens only its own group. The number on the lock tells you which.',
+    rule: 'Each key opens only its own group. The number on the lock tells you which.',
   },
   {
-    name: 'Vault Ring', width: 10, height: 10, colors: SIX, target: 4,
+    name: 'Vault Ring', theme: 'forge', width: 10, height: 10, colors: SIX, target: 4,
     layout: 'rings', shape: 'frame', seed: 13217, slack: 3, moves: [10, 18],
     specials: { lockGroups: 2, lockClusterSize: 5 },
   },
   {
-    name: 'Deadbolt', width: 10, height: 10, colors: SIX, target: 5,
+    name: 'Deadbolt', theme: 'forge', width: 10, height: 10, colors: SIX, target: 5,
     layout: 'quadrants', shape: 'pillars', seed: 14251, slack: 3, moves: [10, 18],
     specials: { lockGroups: 2, lockClusterSize: 6 },
   },
 
   // 15-18 - shuffles, then everything at once.
   {
-    name: 'Static', width: 10, height: 10, colors: SIX, target: 0,
+    name: 'Static', theme: 'signal', width: 10, height: 10, colors: SIX, target: 0,
     layout: 'veins', shape: 'full', seed: 15277, slack: 4, moves: [10, 18],
     specials: { shuffles: 1 },
-    hint: 'A shuffle tile re-deals every unclaimed ordinary tile the moment you absorb it.',
+    rule: 'A shuffle tile re-deals every unclaimed ordinary tile the moment you absorb it.',
   },
   {
-    name: 'Interference', width: 10, height: 10, colors: SIX, target: 3,
+    name: 'Interference', theme: 'signal', width: 10, height: 10, colors: SIX, target: 3,
     layout: 'bands', shape: 'teeth', seed: 16333, slack: 3, moves: [10, 19],
     specials: { shuffles: 2 },
   },
   {
-    name: 'Locked Static', width: 11, height: 11, colors: SIX, target: 1,
+    name: 'Locked Static', theme: 'signal', width: 11, height: 11, colors: SIX, target: 1,
     layout: 'patchwork', shape: 'cross', seed: 17389, slack: 3, moves: [11, 19],
     specials: { lockGroups: 1, lockClusterSize: 5, shuffles: 1 },
   },
   {
-    name: 'Chromaflow', width: 11, height: 11, colors: SEVEN, target: 6,
+    name: 'Chromaflow', theme: 'spectrum', width: 11, height: 11, colors: SEVEN, target: 6,
     layout: 'weave', shape: 'full', seed: 18397, slack: 2, moves: [12, 20],
     specials: { lockGroups: 2, lockClusterSize: 5, shuffles: 2 },
-    hint: 'Keys, locks and shuffles together. Finish on Sand - and keep one Sand tile in reserve.',
+    tip: 'Keys, locks and shuffles together. Finish on Sand - and keep one Sand tile in reserve.',
   },
 ]
 
@@ -172,6 +184,8 @@ interface Grid {
   width: number
   height: number
   colors: (ColorId | null)[]
+  /** Where the flow starts, as `[x, y]` — decided by the shape. */
+  origin: [number, number]
 }
 
 const STEPS: [number, number][] = [
@@ -187,6 +201,7 @@ export function makeGrid(spec: LevelSpec, seed: number): { grid: Grid; seed: num
   let s = seed
 
   const mask = shapeMask(spec.shape, width, height)
+  const origin = pickOrigin(mask, width, height, seed, spec.origin ?? 'rim')
   const put = (i: number, c: ColorId) => {
     if (mask[i]) colors[i] = c
   }
@@ -274,7 +289,7 @@ export function makeGrid(spec: LevelSpec, seed: number): { grid: Grid; seed: num
   }
   if (spec.layout === 'veins') s = traceVeins(spec, colors, mask, s)
 
-  return { grid: { width, height, colors }, seed: s }
+  return { grid: { width, height, colors, origin }, seed: s }
 }
 
 /**
@@ -327,6 +342,7 @@ function traceVeins(
   return s
 }
 
+/** Which tiles a shape keeps. Where the flow starts on it is `pickOrigin`'s job. */
 export function shapeMask(shape: Shape, width: number, height: number): boolean[] {
   const mask: boolean[] = new Array(width * height).fill(true)
   const set = (x: number, y: number, v: boolean) => {
@@ -420,41 +436,96 @@ export function shapeMask(shape: Shape, width: number, height: number): boolean[
       break
     }
   }
-  carveBay(mask, width, height)
   return mask
 }
 
 /**
- * (0,0) must always be playable. Symmetric shapes bite off all four corners, so
- * when the origin lands in a bite we have to reconnect it.
- *
- * Opening a one-tile channel to the body was the obvious way and the wrong one:
- * a corridor one tile wide has exactly one colour at each step, so every move
- * through it is forced and the level opens with several wasted turns. Instead
- * open the whole corner triangle up to the body's nearest diagonal, which meets
- * it across a wide front — the origin gets a bay with several ways out of it.
+ * BFS distance from `from` to every tile through `passable`; -1 = unreachable.
+ * Manhattan distance is wrong on shaped boards - the atoll's hole and the
+ * serpentine's walls make the walk far longer than the crow flies.
  */
-function carveBay(mask: boolean[], width: number, height: number): void {
-  if (mask[0]) return
+export function bfsDistances(width: number, height: number, passable: boolean[], from: number): Int32Array {
+  const dist = new Int32Array(width * height).fill(-1)
+  const queue = [from]
+  dist[from] = 0
+  for (let head = 0; head < queue.length; head++) {
+    const i = queue[head]
+    const x = i % width
+    const y = (i / width) | 0
+    for (const [dx, dy] of STEPS) {
+      const nx = x + dx
+      const ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
+      const n = ny * width + nx
+      if (!passable[n] || dist[n] >= 0) continue
+      dist[n] = dist[i] + 1
+      queue.push(n)
+    }
+  }
+  return dist
+}
 
-  let nearest = Infinity
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (mask[y * width + x]) nearest = Math.min(nearest, x + y)
-    }
+/** Rim tiles may sit this far inside the outermost eccentricity and still count. */
+const RIM_DEPTH = 1
+
+/**
+ * Picks where the flow starts: a seeded draw from the board's rim - the tiles
+ * furthest from everything else, by walking distance. The origin study
+ * (`npm run levels:origins`) showed the start's eccentricity is what sets a
+ * level's length, so every shape's natural start (a corner, an arm tip) is
+ * already a rim tile; drawing among them adds variety without moving the
+ * difficulty. A shape never needs a bay carved for its origin any more - the
+ * pick is always a playable tile - and the profiler gate in `isEngaging` still
+ * rejects a rim tile that opens with forced moves.
+ *
+ * The draw uses its own RNG stream so changing the origin rule leaves the
+ * colour layout of every level untouched. A spec can opt out with
+ * `origin: 'corner'`, which the tutorial levels do so the first boards all
+ * start where the how-to-play says.
+ */
+export function pickOrigin(
+  mask: boolean[],
+  width: number,
+  height: number,
+  seed: number,
+  mode: 'rim' | 'corner' = 'rim',
+): [number, number] {
+  if (mode === 'corner') {
+    if (!mask[0]) throw new Error('origin "corner" asked for on a shape that cuts off (0,0)')
+    return [0, 0]
   }
-  if (!Number.isFinite(nearest)) {
-    mask[0] = true
-    return
+  const tiles: number[] = []
+  mask.forEach((p, i) => p && tiles.push(i))
+  const ecc = tiles.map((i) => {
+    const d = bfsDistances(width, height, mask, i)
+    return Math.max(...tiles.map((t) => d[t]))
+  })
+  const rimLine = Math.max(...ecc) - RIM_DEPTH
+  // A tile with a single way out opens the level with a forced click, so a
+  // one-wide tip (the hourglass corner, say) is never a candidate.
+  const exits = (i: number) => {
+    const x = i % width
+    const y = (i / width) | 0
+    return STEPS.filter(([dx, dy]) => {
+      const nx = x + dx
+      const ny = y + dy
+      return nx >= 0 && ny >= 0 && nx < width && ny < height && mask[ny * width + nx]
+    }).length
   }
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (x + y < nearest) mask[y * width + x] = true
-    }
-  }
+  const rim = tiles.filter((i, k) => ecc[k] >= rimLine && exits(i) >= 2)
+  const pick = nextInt((seed ^ 0x5eed0b1) >>> 0, rim.length)
+  const i = rim[pick.value]
+  return [i % width, (i / width) | 0]
 }
 
 // -------------------------------------------------------------- specials ---
+
+/** Lock clusters anchor at least this fraction of the origin's reach away. */
+const LOCK_FAR = 0.6
+/** Keys sit closer than this fraction of the origin's reach. */
+const KEY_NEAR = 0.55
+/** Anchors tried per lock group before giving up on placing it. */
+const ANCHOR_TRIES = 12
 
 export function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: string[]; seed: number } {
   const { width, height } = grid
@@ -462,62 +533,80 @@ export function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: 
   let s = seed
   const plan = spec.specials ?? {}
   const taken = new Set<number>()
-  const free = (i: number) => grid.colors[i] !== null && !taken.has(i) && i !== 0
+  const originAt = originIndex(grid)
+  const free = (i: number) => grid.colors[i] !== null && !taken.has(i) && i !== originAt
 
-  // Lock clusters sit away from the origin; their key sits on the near side so
-  // it is always reachable without passing through the locks.
+  const playable = grid.colors.map((c) => c !== null)
+  const dist = bfsDistances(width, height, playable, originAt)
+  const reach = Math.max(...dist)
+  /** Walking distance from the origin with every lock placed so far treated as a wall. */
+  const openDistances = () =>
+    bfsDistances(width, height, playable.map((p, i) => p && !tokens[i].startsWith('L')), originAt)
+
+  // Lock clusters sit away from the origin; their key sits on the near side.
+  // Distance alone is not enough on a shaped board - a cluster can sever a ring
+  // or a neck - so each key must be reachable with every lock treated as a
+  // wall, and a cluster that walls off an earlier group's key is undone.
+  const keys: number[] = []
   for (let g = 1; g <= (plan.lockGroups ?? 0); g++) {
-    const farLine = Math.floor((width + height) * 0.55)
+    const farLine = Math.round(reach * LOCK_FAR)
+    const nearLine = Math.round(reach * KEY_NEAR)
     const anchorPool: number[] = []
     for (let i = 0; i < tokens.length; i++) {
-      const x = i % width
-      const y = (i / width) | 0
-      if (free(i) && x + y >= farLine) anchorPool.push(i)
+      if (free(i) && dist[i] >= farLine) anchorPool.push(i)
     }
-    if (anchorPool.length === 0) continue
-    const pick = nextInt(s, anchorPool.length)
-    s = pick.seed
 
-    // Grow a small blob of locks out from the anchor.
-    const cluster: number[] = []
-    const queue = [anchorPool[pick.value]]
-    while (queue.length > 0 && cluster.length < (plan.lockClusterSize ?? 4)) {
-      const i = queue.shift() as number
-      if (!free(i)) continue
-      taken.add(i)
-      cluster.push(i)
-      const x = i % width
-      const y = (i / width) | 0
-      for (const [dx, dy] of STEPS) {
-        const nx = x + dx
-        const ny = y + dy
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
-        queue.push(ny * width + nx)
+    let placed = false
+    for (let attempt = 0; attempt < ANCHOR_TRIES && anchorPool.length > 0 && !placed; attempt++) {
+      const pick = nextInt(s, anchorPool.length)
+      s = pick.seed
+      const anchor = anchorPool.splice(pick.value, 1)[0]
+
+      // Grow a small blob of locks out from the anchor.
+      const cluster: number[] = []
+      const queue = [anchor]
+      while (queue.length > 0 && cluster.length < (plan.lockClusterSize ?? 4)) {
+        const i = queue.shift() as number
+        if (!free(i)) continue
+        taken.add(i)
+        cluster.push(i)
+        const x = i % width
+        const y = (i / width) | 0
+        for (const [dx, dy] of STEPS) {
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
+          queue.push(ny * width + nx)
+        }
       }
-    }
-    for (const i of cluster) tokens[i] = `L${grid.colors[i]}:${g}`
+      for (const i of cluster) tokens[i] = `L${grid.colors[i]}:${g}`
 
-    const nearLine = Math.floor((width + height) * 0.5)
-    const keyPool: number[] = []
-    for (let i = 0; i < tokens.length; i++) {
-      const x = i % width
-      const y = (i / width) | 0
-      if (free(i) && x + y > 1 && x + y < nearLine) keyPool.push(i)
+      const open = openDistances()
+      const keyPool: number[] = []
+      for (let i = 0; i < tokens.length; i++) {
+        if (free(i) && open[i] > 1 && open[i] < nearLine) keyPool.push(i)
+      }
+      if (keyPool.length === 0 || keys.some((k) => open[k] < 0)) {
+        for (const i of cluster) {
+          tokens[i] = String(grid.colors[i])
+          taken.delete(i)
+        }
+        continue
+      }
+      const kp = nextInt(s, keyPool.length)
+      s = kp.seed
+      const keyIndex = keyPool[kp.value]
+      tokens[keyIndex] = `K${grid.colors[keyIndex]}:${g}`
+      taken.add(keyIndex)
+      keys.push(keyIndex)
+      placed = true
     }
-    if (keyPool.length === 0) continue
-    const kp = nextInt(s, keyPool.length)
-    s = kp.seed
-    const keyIndex = keyPool[kp.value]
-    tokens[keyIndex] = `K${grid.colors[keyIndex]}:${g}`
-    taken.add(keyIndex)
   }
 
   for (let n = 0; n < (plan.shuffles ?? 0); n++) {
     const pool: number[] = []
     for (let i = 0; i < tokens.length; i++) {
-      const x = i % width
-      const y = (i / width) | 0
-      if (free(i) && x + y > 2) pool.push(i)
+      if (free(i) && dist[i] > 2) pool.push(i)
     }
     if (pool.length === 0) break
     const pick = nextInt(s, pool.length)
@@ -536,12 +625,13 @@ export function buildTokens(spec: LevelSpec, grid: Grid, seed: number): { rows: 
 
 // ---------------------------------------------------------------- checks ---
 
-/** Every playable tile must be reachable from (0,0), ignoring colours. */
+/** Every playable tile must be reachable from the origin, ignoring colours. */
 export function isConnected(grid: Grid): boolean {
   const { width, height, colors } = grid
   const seen = new Uint8Array(colors.length)
-  const stack = [0]
-  seen[0] = 1
+  const start = originIndex(grid)
+  const stack = [start]
+  seen[start] = 1
   let count = 1
   while (stack.length > 0) {
     const i = stack.pop() as number
@@ -573,10 +663,13 @@ function playableCount(rows: string[]): number {
  * string of two-tile nibbles. Two forced moves is the natural floor (the
  * endgame really does narrow to one colour), so only more than that is a smell.
  */
-function isEngaging(level: LevelDefinition, solution: ColorId[]): boolean {
-  const { forced, grind, absorbed } = profileSolution(level, solution)
+export function isEngaging(level: LevelDefinition, solution: ColorId[]): boolean {
+  const { forced, grind, absorbed, options } = profileSolution(level, solution)
   if (absorbed[0] < 3) return false
-  if (forced > 3) return false
+  // The first click must be a decision: a start whose neighbours all share one
+  // colour is a forced opening, whatever the rest of the level does.
+  if (options[0] < 2) return false
+  if (forced > 2) return false
   return grind <= Math.max(2, Math.round(solution.length * 0.25))
 }
 
@@ -600,14 +693,16 @@ function buildLevel(spec: LevelSpec, id: number): LevelDefinition {
       name: spec.name,
       width: spec.width,
       height: spec.height,
+      theme: spec.theme,
       colors: spec.colors,
       targetColor: spec.target,
       turnLimit: spec.width * spec.height,
       rows: tokenised.rows,
+      ...(built.grid.origin[0] || built.grid.origin[1] ? { origin: built.grid.origin } : {}),
       seed: (seed * 31 + 7) >>> 0,
       starScore: [0, 0],
       starTurns: [0, 0],
-      hint: spec.hint,
+      hint: hintOf(spec),
     }
 
     const solution = findSolution(draft, { attempts: 400, seed: draft.seed })
@@ -630,6 +725,12 @@ function buildLevel(spec: LevelSpec, id: number): LevelDefinition {
   throw new Error(`level ${id} (${spec.name}): no solvable board found`)
 }
 
+function hintOf(spec: LevelSpec): LevelHint | undefined {
+  if (spec.rule) return { kind: 'rule', text: spec.rule }
+  if (spec.tip) return { kind: 'tip', text: spec.tip }
+  return undefined
+}
+
 function finalise(draft: LevelDefinition, spec: LevelSpec, solution: ColorId[]): LevelDefinition {
   const base = playableCount(draft.rows) * 10
   return {
@@ -647,11 +748,15 @@ function emit(levels: LevelDefinition[]): string {
   const body = levels
     .map((level) => {
       const rows = level.rows.map((r) => `      '${r}',`).join('\n')
-      const hint = level.hint ? `\n    hint: ${JSON.stringify(level.hint)},` : ''
+      const hint = level.hint
+        ? `\n    hint: { kind: '${level.hint.kind}', text: ${JSON.stringify(level.hint.text)} },`
+        : ''
+      const origin = level.origin ? `\n    origin: [${level.origin.join(', ')}],` : ''
       return [
         '  {',
         `    id: ${level.id},`,
         `    name: ${JSON.stringify(level.name)},`,
+        `    theme: '${level.theme}',`,
         `    width: ${level.width},`,
         `    height: ${level.height},`,
         `    colors: [${level.colors.join(', ')}],`,
@@ -662,7 +767,7 @@ function emit(levels: LevelDefinition[]): string {
         `    starTurns: [${level.starTurns.join(', ')}],${hint}`,
         '    rows: [',
         rows,
-        '    ],',
+        `    ],${origin}`,
         `    solution: [${(level.solution ?? []).join(', ')}],`,
         '  },',
       ].join('\n')
