@@ -30,6 +30,7 @@ Then open the URL Vite prints (http://localhost:5173 by default).
 | `npm run levels:analyze` | Dev-only: difficulty profile of every level — forced moves, grind moves, options per move |
 | `npm run levels:shapes` | Dev-only: build each shape at 8×8–12×12 and report how the results play |
 | `npm run levels:origins` | Dev-only: hold each board fixed and move only the origin — rim, centre, random — to see what the start does to a level |
+| `python3 scripts/generate-icons.py` | Dev-only: regenerate the PWA icons and iOS launch images in `public/`, and print the `<link>` block for `index.html` |
 
 ## Rules
 
@@ -128,6 +129,75 @@ entry, then `npm run levels:build`.
 | **Key** | Absorbed like any tile of its colour; opens every lock in its group. |
 | **Lock** | Grey and unabsorbable until its key is collected. While locked it does **not** count as an available target-colour tile. |
 | **Shuffle** | Absorbs normally, then instantly re-deals the colours of the remaining ordinary tiles. Positions, tile kinds, key/lock pairings, locked tiles and your own region are all preserved. |
+
+## Installing it as an app
+
+The build is an installable PWA: a web manifest, maskable icons, and a Workbox
+service worker that precaches every built file (~300 KB), so once loaded the
+game plays with no network at all. There is no backend to be offline from.
+
+- **Android / Chrome** — the browser offers "Install app" on its own.
+- **iOS / Safari** — no prompt exists; the player must use Share → *Add to
+  Home Screen*. Once installed it runs without browser chrome, drawing under
+  the status bar, which the safe-area padding in `index.css` accounts for.
+- **Updates** are opt-in rather than silent: `registerType: 'prompt'` means a
+  new deploy surfaces the toast in `src/components/UpdatePrompt.tsx`, and the
+  bundle is only swapped when the player taps **Reload** — never mid-level.
+  The worker is re-checked on `visibilitychange` and hourly, because an
+  installed app is suspended and resumed for days without a navigation, and a
+  navigation is otherwise the only thing that would notice a new build.
+- **Launch images.** iOS ignores the manifest's `background_color` and flashes
+  blank white on launch unless an `apple-touch-startup-image` matches the
+  device exactly, so ten portrait sizes ship. They are deliberately kept out
+  of the Workbox precache (`globIgnores`): Safari reads them at launch and the
+  running app never requests them, so precaching would roughly double the
+  offline payload.
+- **The screen stays awake** while a board is live (`src/hooks/useWakeLock.ts`).
+  A turn-based puzzle invites sitting on one position for a minute, which the
+  OS reads as idle. The lock is dropped on win, loss or leaving the board, and
+  reacquired on return — browsers release it whenever the page is hidden.
+
+## Deploying to Cloudflare Pages
+
+The game is static, so hosting only needs to serve files over HTTPS — a service
+worker will not register without it. Cloudflare Pages is the fit here: free at
+this size, deploys straight from the repo, and issues the certificate itself.
+
+Connect the repository in the Cloudflare dashboard (*Workers & Pages* → *Create*
+→ *Pages* → *Connect to Git*) with:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Node version | read from `.node-version` (22) |
+
+Two files in this repo matter to the deploy:
+
+- `.node-version` — Vite 8 needs Node 20+, and Pages defaults to an older
+  runtime without it.
+- `public/_headers` — the cache policy. Hashed bundles under `/assets/*` are
+  immutable for a year; `index.html`, `sw.js` and `manifest.webmanifest` are
+  `no-cache`, because those three decide which bundle a browser gets. Caching
+  them is what leaves an installed copy stuck on an old version after a deploy.
+
+The `*.pages.dev` URL this produces is HTTPS, so the game is fully installable
+from it — worth testing there before touching DNS. A custom domain is optional.
+
+### Custom domains
+
+Add the domain under the Pages project's *Custom domains* tab; Cloudflare
+provisions the certificate once DNS resolves. What that takes depends on which
+hostname you use:
+
+- **A subdomain** (`play.example.com`) — add the CNAME Cloudflare shows you at
+  whatever host already runs the domain's DNS. Nothing moves, and mail for the
+  domain is untouched. Pages accepts a CNAME from external DNS; a Cloudflare
+  *Worker* would not, which is why this project deploys to Pages.
+- **The apex** (`example.com`) — DNS has to move to Cloudflare, because DNS
+  forbids a CNAME at the zone root. That is a nameserver change at the
+  registrar; the registration itself stays put. Check that MX and SPF/DKIM
+  records import correctly *before* switching, or mail for that domain breaks.
 
 ## Architecture
 
@@ -249,3 +319,22 @@ best score, best spare turns, the flawless flag, the last level played and the
 two settings. Reads are defensive — a corrupt or missing blob degrades to a
 fresh profile rather than throwing, and writes are wrapped so private-browsing
 modes just don't persist. **Reset progress** on the title screen clears it.
+
+Installed on a phone this is the only copy of a player's progress, and iOS
+clears script-writable storage for sites left unopened for about a week. The
+app asks for storage persistence on boot (`requestPersistentStorage`), which
+Chrome grants to installed PWAs and Safari currently ignores — so treat an
+iOS save as durable but not guaranteed.
+
+**Back up / transfer** on the title screen is the answer to that: it copies the
+profile out as text and pastes one back in. Copy/paste rather than a file
+download, because an installed iOS PWA handles `<a download>` and blob URLs
+badly; the share sheet appears only where the API exists.
+
+Imports **merge** rather than overwrite. Every field of a level record is a
+maximum and `flawless` is a disjunction, so `mergeSaves` is order-independent —
+importing A into B gives the same profile as importing B into A, and a device
+with its own progress cannot lose a level to an import. Settings stay local,
+since motion and symbol preferences describe the device, not the profile. That
+property is also what any future cross-device sync would be built on; the merge
+is pinned by tests in `src/game/__tests__/progress.test.ts`.

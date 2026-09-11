@@ -5,6 +5,8 @@ import { GameScreen } from './components/GameScreen.tsx'
 import type { WinPayload } from './components/GameScreen.tsx'
 import { HowToPlay } from './components/HowToPlay.tsx'
 import { Modal } from './components/Modal.tsx'
+import { SaveTransfer } from './components/SaveTransfer.tsx'
+import { UpdatePrompt } from './components/UpdatePrompt.tsx'
 import { LEVELS, TOTAL_LEVELS, getLevel } from './game/levels.ts'
 import {
   clearSave,
@@ -12,6 +14,7 @@ import {
   highestUnlocked,
   loadSave,
   recordWin,
+  requestPersistentStorage,
   saveSave,
 } from './game/progress.ts'
 import type { SaveData, Settings } from './game/progress.ts'
@@ -25,11 +28,15 @@ export default function App() {
   const [levelId, setLevelId] = useState<number>(() => 1)
   const [howToOpen, setHowToOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
 
   const reducedMotion = useReducedMotion(save.settings.motion)
 
   // Persist on every change; the save blob is tiny so this stays cheap.
   useEffect(() => saveSave(save), [save])
+
+  // Ask once per load that the browser keep the save through storage pressure.
+  useEffect(() => requestPersistentStorage(), [])
 
   useEffect(() => {
     document.documentElement.dataset.motion = reducedMotion ? 'reduced' : 'full'
@@ -79,6 +86,7 @@ export default function App() {
           onPlay={() => startLevel(save.seenHowTo ? resume : 1)}
           onLevels={() => setScreen('levels')}
           onHowToPlay={() => setHowToOpen(true)}
+          onTransferSave={() => setTransferOpen(true)}
           onResetProgress={() => setConfirmReset(true)}
         />
       )}
@@ -103,6 +111,22 @@ export default function App() {
       )}
 
       {howToOpen && <HowToPlay onClose={() => setHowToOpen(false)} />}
+
+      {transferOpen && (
+        <Modal
+          title="Back up / transfer"
+          onClose={() => setTransferOpen(false)}
+          footer={
+            <button type="button" className="button" onClick={() => setTransferOpen(false)}>
+              Done
+            </button>
+          }
+        >
+          <SaveTransfer save={save} onImport={setSave} />
+        </Modal>
+      )}
+
+      <UpdatePrompt />
 
       {confirmReset && (
         <Modal

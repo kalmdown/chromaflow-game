@@ -1,0 +1,17 @@
+# Cache policy for Cloudflare Pages.
+#
+# The hashed bundles can be cached forever; the three files that decide which
+# bundle a browser gets must not be, or an installed copy of the game can keep
+# serving a stale version long after a deploy.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/index.html
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
