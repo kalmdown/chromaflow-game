@@ -22,6 +22,25 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "public"
 # Supersampling factor per axis; 4 means 16 samples per output pixel.
 SS = 4
 
+# Portrait iPhone sizes as (CSS width, CSS height, device pixel ratio). Only
+# portrait: the game is played upright, and covering both orientations would
+# double the asset count for a launch image most players never see.
+DEVICES = (
+    (440, 956, 3),  # iPhone 16 Pro Max
+    (430, 932, 3),  # 15 Pro Max, 14 Pro Max
+    (428, 926, 3),  # 12/13 Pro Max, 14 Plus
+    (414, 896, 3),  # XS Max, 11 Pro Max
+    (414, 896, 2),  # XR, 11
+    (402, 874, 3),  # iPhone 16 Pro
+    (393, 852, 3),  # 14 Pro, 15, 15 Pro
+    (390, 844, 3),  # 12, 13, 14
+    (375, 812, 3),  # X, XS, 11 Pro, 12/13 mini
+    (375, 667, 2),  # SE 2nd/3rd gen, 8
+)
+
+# Logo edge length inside a splash, in device pixels.
+SPLASH_LOGO_PX = 320
+
 # The design, in the 64-unit coordinate space of public/favicon.svg.
 VIEWBOX = 64.0
 BG = (0x08, 0x0D, 0x1C)
@@ -73,11 +92,11 @@ def sample(px: float, py: float, content_scale: float, round_outer: bool) -> tup
     return BG
 
 
-def render(size: int, content_scale: float = 1.0, round_outer: bool = True) -> bytes:
-    """Render to RGBA bytes, supersampled SS x SS per output pixel."""
+def render(size: int, content_scale: float = 1.0, round_outer: bool = True) -> list[bytes]:
+    """Render to a list of RGBA rows, supersampled SS x SS per output pixel."""
     unit = VIEWBOX / (size * SS)
     offset = unit / 2.0
-    rows = bytearray()
+    rows: list[bytes] = []
     samples = SS * SS
 
     for oy in range(size):
@@ -101,11 +120,48 @@ def render(size: int, content_scale: float = 1.0, round_outer: bool = True) -> b
                 # so edge pixels blend toward the shape rather than toward black.
                 covered = a // 255
                 row += bytes((r // covered, g // covered, b // covered, a // samples))
-        rows += b"\x00" + row
-    return bytes(rows)
+        rows.append(bytes(row))
+    return rows
 
 
-def write_png(path: Path, size: int, rgba: bytes) -> None:
+def render_splash(width: int, height: int, logo: list[bytes]) -> list[bytes]:
+    """Composite a pre-rendered logo onto a solid ground.
+
+    Supersampling a full 1320x2868 splash in pure Python would take minutes, and
+    it would be wasted: a splash is one flat colour plus the logo already
+    rasterised above. So the background is one repeated row and only the rows
+    the logo covers are touched.
+    """
+    span = len(logo)
+    ground = bytes((*BG, 255)) * width
+    left = (width - span) // 2
+    top = (height - span) // 2
+    rows: list[bytes] = []
+
+    for y in range(height):
+        if not top <= y < top + span:
+            rows.append(ground)
+            continue
+        row = bytearray(ground)
+        src = logo[y - top]
+        for x in range(span):
+            alpha = src[x * 4 + 3]
+            if alpha == 0:
+                continue
+            at = (left + x) * 4
+            if alpha == 255:
+                row[at : at + 4] = src[x * 4 : x * 4 + 4]
+            else:
+                for channel in range(3):
+                    row[at + channel] = (
+                        src[x * 4 + channel] * alpha + BG[channel] * (255 - alpha)
+                    ) // 255
+        rows.append(bytes(row))
+
+    return rows
+
+
+def write_png(path: Path, width: int, height: int, rows: list[bytes]) -> None:
     def chunk(tag: bytes, data: bytes) -> bytes:
         return (
             struct.pack(">I", len(data))
@@ -114,7 +170,8 @@ def write_png(path: Path, size: int, rgba: bytes) -> None:
             + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
         )
 
-    header = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    rgba = b"".join(b"\x00" + row for row in rows)  # filter byte 0 per scanline
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)  # 8-bit RGBA
     png = (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
@@ -137,9 +194,34 @@ def main() -> None:
     ]
     for name, size, scale, round_outer in targets:
         path = OUT_DIR / name
-        write_png(path, size, render(size, scale, round_outer))
+        write_png(path, size, size, render(size, scale, round_outer))
         print(f"{name}: {size}x{size}, {path.stat().st_size} bytes")
+
+    # iOS ignores the manifest's background_color and shows a blank white flash
+    # on launch unless an apple-touch-startup-image matches the device exactly,
+    # so each size has to be emitted on its own. The <link> media queries in
+    # index.html must list these same devices.
+    logo = render(SPLASH_LOGO_PX, 1.0, True)
+    for css_w, css_h, dpr in DEVICES:
+        width, height = css_w * dpr, css_h * dpr
+        name = f"splash-{width}x{height}.png"
+        path = OUT_DIR / name
+        write_png(path, width, height, render_splash(width, height, logo))
+        print(f"{name}: {width}x{height}, {path.stat().st_size} bytes")
+
+
+def print_link_tags() -> None:
+    """Emit the index.html <link> block, so the two never drift by hand."""
+    print("\n--- paste into index.html ---")
+    for css_w, css_h, dpr in DEVICES:
+        width, height = css_w * dpr, css_h * dpr
+        print(
+            f'    <link rel="apple-touch-startup-image" href="/splash-{width}x{height}.png"\n'
+            f'      media="(device-width: {css_w}px) and (device-height: {css_h}px) '
+            f'and (-webkit-device-pixel-ratio: {dpr}) and (orientation: portrait)" />'
+        )
 
 
 if __name__ == "__main__":
     main()
+    print_link_tags()

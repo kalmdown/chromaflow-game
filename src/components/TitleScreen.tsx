@@ -4,6 +4,7 @@ interface TitleScreenProps {
   onPlay: () => void
   onLevels: () => void
   onHowToPlay: () => void
+  onTransferSave: () => void
   onResetProgress: () => void
   clearedCount: number
   totalLevels: number
@@ -16,6 +17,7 @@ export function TitleScreen({
   onPlay,
   onLevels,
   onHowToPlay,
+  onTransferSave,
   onResetProgress,
   clearedCount,
   totalLevels,
@@ -60,14 +62,23 @@ export function TitleScreen({
           {clearedCount} / {totalLevels} levels cleared · {totalStars} / {totalLevels * 3} stars
         </p>
 
-        <button
-          type="button"
-          className="button button--ghost button--small"
-          onClick={onResetProgress}
-          disabled={!hasProgress}
-        >
-          Reset progress
-        </button>
+        <div className="title__minor">
+          <button
+            type="button"
+            className="button button--ghost button--small"
+            onClick={onTransferSave}
+          >
+            Back up / transfer
+          </button>
+          <button
+            type="button"
+            className="button button--ghost button--small"
+            onClick={onResetProgress}
+            disabled={!hasProgress}
+          >
+            Reset progress
+          </button>
+        </div>
       </div>
     </main>
   )

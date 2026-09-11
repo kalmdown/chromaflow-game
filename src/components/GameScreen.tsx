@@ -7,6 +7,7 @@ import { Modal } from './Modal.tsx'
 import { Stars } from './Stars.tsx'
 import { SettingsPanel } from './SettingsPanel.tsx'
 import { useLevelSession } from '../hooks/useLevelSession.ts'
+import { useWakeLock } from '../hooks/useWakeLock.ts'
 import { LOSS_MESSAGES, computeStars } from '../game/engine.ts'
 import { countUnowned } from '../game/board.ts'
 import { paletteEntry } from '../game/palette.ts'
@@ -49,6 +50,9 @@ export function GameScreen({
   onSettingsChange,
 }: GameScreenProps) {
   const session = useLevelSession(level, reducedMotion)
+
+  // Keep the screen awake only while a board is live, not on the result dialogs.
+  useWakeLock(session.state.status === 'playing')
   const { state, flash, busy, canUndo, choose, undo, restart } = session
   const [dialog, setDialog] = useState<Dialog>('none')
   const [hintOpen, setHintOpen] = useState(true)
