@@ -124,7 +124,10 @@ export function GameScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [dialog, choose, undo, level.colors, state.turnsUsed, state.status])
 
-  const headStyle = { '--target-color': target.hex } as CSSProperties
+  const headStyle = {
+    '--target-color': target.hex,
+    '--target-ink': target.ink,
+  } as CSSProperties
 
   return (
     <main className="screen screen--game" style={headStyle}>
