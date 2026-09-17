@@ -10,6 +10,7 @@
   --card: #131c34;
   --card-2: #1b2542;
   --line: #2a3559;
+  --spent: #1e2947;
   --ink: #eef2ff;
   --ink-dim: #9fadd4;
   /* Both dim tiers clear WCAG AA (4.5:1) on every card surface they land on. */
@@ -793,16 +794,27 @@ p {
   height: auto;
 }
 
-/* The owned region reads as one bright mass: lifted, ringed and glowing. */
+/* A tile you have taken is finished business, so it fades out of the way and
+   leaves the colour to the tiles still in play — the only ones worth reading.
+   The fade mixes every hue down to one spent slate rather than just dimming
+   it: a straight brightness cut sinks the dark hues into the board and they
+   start reading as holes. The remaining quarter of the hue is what still says
+   which colour your flow is. The change of tone is not transitioned — the
+   gradient jumps — because the is-fresh pop already animates that moment. */
 .tile.is-owned {
-  box-shadow:
-    0 0 0 2px rgb(255 255 255 / 0.55) inset,
-    0 0 12px -2px var(--tile-color);
-  filter: saturate(1.15) brightness(1.08);
+  /* Light ink on the spent tone, so the glyph and texture do not depend on
+     which hue the tile happened to be. */
+  --tile-ink: #b9c4e6;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--tile-color) 24%, var(--spent)),
+    color-mix(in srgb, var(--tile-shade) 24%, var(--spent))
+  );
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07) inset;
 }
 
 .tile.is-owned .tile__glyph {
-  opacity: 0.85;
+  opacity: 0.4;
 }
 
 .tile.is-origin::after {

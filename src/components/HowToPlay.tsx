@@ -87,14 +87,14 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
         <li>
           <LegendTile color={3} owned />
           <span>
-            <strong>Your flow.</strong> Tiles you have absorbed glow brighter and carry a white
-            outline. They always share one colour, and they always move as one piece.
+            <strong>Your flow.</strong> Tiles you have absorbed fade back into the board. They
+            always share one colour, and they always move as one piece.
           </span>
         </li>
         <li>
           <LegendTile color={1} />
           <span>
-            <strong>Unclaimed.</strong> Flat, unoutlined tiles are still up for grabs. Tap one to
+            <strong>Unclaimed.</strong> Tiles still at full colour are up for grabs. Tap one to
             play its colour.
           </span>
         </li>
