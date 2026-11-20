@@ -547,9 +547,15 @@ p {
   color: var(--ink-faint);
 }
 
+/* The cards in a row stretch to a common height, so pinning the value to the
+   bottom of its card on a line box the chip cannot grow puts every value —
+   plain number or chip-and-name — on the same baseline. */
 .stat__value {
+  margin-top: auto;
   font-weight: 700;
   font-size: 1rem;
+  line-height: 1.5rem;
+  min-height: 1.5rem;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -575,8 +581,8 @@ p {
   display: inline-grid;
   place-items: center;
   position: relative;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 6px;
   background: var(--target-color, var(--accent));
   color: var(--target-ink, var(--accent-ink));
@@ -584,8 +590,9 @@ p {
 }
 
 .target-chip > svg {
-  width: 12px;
-  height: 12px;
+  width: 34%;
+  height: auto;
+  opacity: 0.5;
 }
 
 .target-chip__dot {
@@ -1007,6 +1014,8 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  /* Room for the state tags, which overhang the top border of a pill. */
+  margin-top: 5px;
 }
 
 .swatch:last-child:nth-child(odd) {
@@ -1068,9 +1077,8 @@ p {
 }
 
 /* The target is a destination marker, not a live-interaction ring like the
-   board's solid white glow: a dashed border plus the pill label. */
+   board's solid white glow: a bright solid border plus the tag above it. */
 .swatch.is-target {
-  border-style: dashed;
   border-color: rgb(255 255 255 / 0.85);
 }
 
@@ -1083,38 +1091,49 @@ p {
   filter: none;
 }
 
-.swatch.is-target::after {
-  content: 'target';
-  order: 3;
-  flex: none;
-  margin-left: auto;
+/* Both state tags sit centred on the pill's top border, out of the row, so
+   the name and count never have to share width with them. */
+.swatch__tags {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.swatch__tag {
   font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: var(--ink);
-  color: var(--bg);
   border-radius: 999px;
-  padding: 2px 6px;
+  padding: 2px 7px;
+  line-height: 1.5;
 }
 
-.swatch__key {
-  flex: none;
-  min-width: 1ch;
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: var(--ink-faint);
+.swatch__tag--target {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.swatch__tag--current {
+  background: var(--card-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 /* The one surface still painted in the raw hue — it carries the slot's shape
-   and texture, which are graphics and only need the 3:1 floor. */
+   and texture, which are graphics and only need the 3:1 floor. Sized and
+   faded exactly like a board tile so the two read as the same object. */
 .swatch__glyph {
   position: relative;
   flex: none;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: linear-gradient(160deg, var(--tile-color), var(--tile-shade));
   color: var(--tile-ink);
@@ -1122,8 +1141,9 @@ p {
 }
 
 .swatch__glyph > svg {
-  width: 18px;
-  height: 18px;
+  width: 34%;
+  height: auto;
+  opacity: 0.5;
 }
 
 .swatch__name {

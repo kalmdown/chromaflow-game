@@ -49,18 +49,27 @@ export function ColorPalette({
                 : `${remaining} tile${remaining === 1 ? '' : 's'} reachable. Press ${index + 1}.`)
             }
           >
-            <span className="swatch__key" aria-hidden="true">
-              {index + 1}
-            </span>
+            {/* Both states ride the top border rather than the row, so a long
+                colour name keeps the full width of the pill to itself. */}
+            {(isCurrent || isTarget) && (
+              <span className="swatch__tags" aria-hidden="true">
+                {isCurrent && <span className="swatch__tag swatch__tag--current">current</span>}
+                {isTarget && <span className="swatch__tag swatch__tag--target">target</span>}
+              </span>
+            )}
             {/* The texture rides the glyph chip, the one part still painted in the
                 raw hue — over the pill it would sit behind the label. */}
             <span className="swatch__glyph" data-texture={textureOf(entry, marks)}>
               <ColorGlyph color={color} />
             </span>
             <span className="swatch__name">{entry.name}</span>
-            <span className="swatch__count" aria-hidden="true">
-              {isCurrent ? 'current' : remaining}
-            </span>
+            {/* The current colour has nothing to pick, so its count would only
+                name tiles this turn cannot reach. */}
+            {!isCurrent && (
+              <span className="swatch__count" aria-hidden="true">
+                {remaining}
+              </span>
+            )}
           </button>
         )
       })}
