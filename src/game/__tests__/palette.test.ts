@@ -34,6 +34,14 @@ describe('palette contrast', () => {
     expect(contrast(entry.ink, entry.shade)).toBeGreaterThanOrEqual(3)
   })
 
+  // An absorbed tile fades to `--spent` (#131b30, ~0.011 luminance) mixed with
+  // a seventh of its own hue. A hue whose gradient bottoms out near that tone
+  // makes a live tile read as a spent one, which is what this floor prevents —
+  // it is the palette half of the contract, the CSS half being the mix itself.
+  it.each(ENTRIES)('%s / %s stays clear of the spent tone', (_theme, _name, entry) => {
+    expect(luminance(entry.shade)).toBeGreaterThanOrEqual(0.12)
+  })
+
   it('keeps every swatch name distinct within its theme', () => {
     for (const theme of Object.values(THEMES)) {
       const names = theme.colors.map((c) => c.name)

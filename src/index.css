@@ -10,6 +10,8 @@
   --card: #131c34;
   --card-2: #1b2542;
   --line: #2a3559;
+  /* What an absorbed tile fades to — see .tile.is-owned. */
+  --spent: #131b30;
   --ink: #eef2ff;
   --ink-dim: #9fadd4;
   /* Both dim tiers clear WCAG AA (4.5:1) on every card surface they land on. */
@@ -800,16 +802,37 @@ p {
   height: auto;
 }
 
-/* The owned region reads as one bright mass: lifted, ringed and glowing. */
+/* A tile you have taken is finished business, so it drops back to a dark
+   spent slate and leaves the colour to the tiles still in play — the only
+   ones worth reading. Measured over whole tiles on levels 10, 12 and 18, a
+   spent tile sits around 0.025 relative luminance against 0.22–0.30 for a
+   live one.
+
+   The fade mixes every hue down to one tone rather than dimming each in
+   place: a straight brightness cut leaves a spent tile as light as the
+   darkest live hues, which is the whole complaint. A seventh of the hue
+   survives, which is enough to say which colour the flow is without
+   competing with the board.
+
+   How dark it can go is bounded from below by the voids, which the spent
+   tone must not join — at this value a spent tile is ~1.5:1 on the holes,
+   and the inset hairline is what carries the rest of that distinction.
+   The change of tone is not transitioned — the gradient jumps — because the
+   is-fresh pop already animates that moment. */
 .tile.is-owned {
-  box-shadow:
-    0 0 0 2px rgb(255 255 255 / 0.55) inset,
-    0 0 12px -2px var(--tile-color);
-  filter: saturate(1.15) brightness(1.08);
+  /* Light ink on the spent tone, so the glyph and texture do not depend on
+     which hue the tile happened to be. */
+  --tile-ink: #b9c4e6;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--tile-color) 14%, var(--spent)),
+    color-mix(in srgb, var(--tile-shade) 14%, var(--spent))
+  );
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1) inset;
 }
 
 .tile.is-owned .tile__glyph {
-  opacity: 0.85;
+  opacity: 0.3;
 }
 
 .tile.is-origin::after {

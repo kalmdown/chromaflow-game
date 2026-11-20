@@ -36,6 +36,11 @@ export interface PaletteEntry {
  * in sea colours, the key-and-lock levels in metals, the shuffle levels in
  * neon. Each theme carries seven hues in slot order; a five-colour level uses
  * the first five.
+ *
+ * Hues also have a floor: an absorbed tile fades to a dark slate, so a hue
+ * whose gradient bottoms out near that tone would still look in play once
+ * taken. The deep blues and violets sat there and were lifted until the
+ * `shade` end cleared it — see the luminance floor in `palette.test.ts`.
  */
 export type ThemeId =
   | 'spectrum'
@@ -116,7 +121,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Sunlight', '#ffd25f'],
     ['Seafoam', '#6fe6b0'],
     ['Aqua', '#38c6ec'],
-    ['Deep', '#4a6de8'],
+    ['Deep', '#6c88ec'],
     ['Kelp', '#a3bd4e'],
     ['Foam', '#e8f3ff'],
   ]),
@@ -126,7 +131,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Straw', '#e6c25a'],
     ['Reed', '#8fbe62'],
     ['Pool', '#45b8c9'],
-    ['Slate', '#5f7ad9'],
+    ['Slate', '#6f88dd'],
     ['Lilac', '#b48ad9'],
     ['Mist', '#dfe6ee'],
   ]),
@@ -136,7 +141,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Sandstone', '#efc46a'],
     ['Sage', '#9ccf7a'],
     ['River', '#3ec4d4'],
-    ['Twilight', '#6a6fdc'],
+    ['Twilight', '#8387e2'],
     ['Bloom', '#e07ad1'],
     ['Limestone', '#f0e6c8'],
   ]),
@@ -156,7 +161,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Sand', '#f2c86b'],
     ['Scrub', '#a9c85c'],
     ['Oasis', '#3fc9b8'],
-    ['Dusk', '#7a6fe0'],
+    ['Dusk', '#8f86e5'],
     ['Rose', '#e58ad0'],
     ['Bone', '#f3ead6'],
   ]),
@@ -166,7 +171,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Brass', '#e6b93f'],
     ['Verdigris', '#5fc99a'],
     ['Steel', '#6fb5e6'],
-    ['Cobalt', '#6f74ea'],
+    ['Cobalt', '#8589ed'],
     ['Rose gold', '#e88fb0'],
     ['Silver', '#dfe4ec'],
   ]),
@@ -176,7 +181,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ['Volt', '#f2ec3f'],
     ['Acid', '#7cf65a'],
     ['Cyan', '#3ff0ff'],
-    ['Ultraviolet', '#8f6bff'],
+    ['Ultraviolet', '#9d7dff'],
     ['Tangerine', '#ff8b3d'],
     ['Static', '#e7ebf5'],
   ]),
